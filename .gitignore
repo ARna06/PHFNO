@@ -7,3 +7,5 @@ build/
 dist/
 /datasets/**/*.pt
 .vscode/
+/results/**/*.pt
+/results/**/*.png

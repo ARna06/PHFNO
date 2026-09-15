@@ -4,9 +4,20 @@ This implementation learns how a spatial field changes over time. It combines
 an FNO from [NeuralOperator](https://github.com/neuraloperator/neuraloperator)
 with a small PyTorch model that separates energy, dissipation, and external input.
 
-Start with [the assembly notebook](ipynb/01_assemble_phfno.ipynb). It builds both
+Start with [the assembly notebook](ipynb/assemble_phfno.ipynb). It builds both
 models, checks their basic properties, and runs a few training steps on synthetic
 trajectories. The reusable code lives in `src/phfno/`.
+
+The [Navier–Stokes comparison notebook](ipynb/compare_phfno_fno.ipynb)
+trains both models on the saved noisy datasets using CUDA. Run its cells in order
+with the **research** kernel to see learning curves, held-out rollouts, velocity
+slices, and checks against the forcing, dissipation, and Navier–Stokes derivatives.
+The [experiment guide](experiments.md) explains the split, metrics, and limitations.
+The notebook generates missing data for the larger run: 32 trajectories per
+flow type on a `24³` grid, with 41 snapshots each. It trains for 3,000 updates
+per model across three seeds, with `tqdm` progress bars and plots displayed inline.
+Training and evaluation helpers live in `src/experiments/`; checkpoints and
+numerical results are saved under `results/phfno_fno_large/`.
 
 ## How the pieces fit together
 
@@ -140,8 +151,8 @@ Both models project the initial field into the retained Fourier space.
 
 The baseline evaluates its FNO on the external grid. Matching its width and depth
 with the structured model does not match parameter counts or computation cost.
-The notebook demonstrates assembly and training; it does not report a benchmark
-or establish that either architecture performs better.
+The assembly notebook demonstrates the interface. The separate comparison
+notebook measures both models on the same data and reports their different costs.
 
 ## Where to find the code
 
@@ -151,7 +162,7 @@ or establish that either architecture performs better.
 | [model.py](src/phfno/model.py) | Learned energy, damping, factors, and structured dynamics |
 | [integrators.py](src/phfno/integrators.py) | Autodiff energy gradient and Euler step |
 | [baseline.py](src/phfno/baseline.py) | FNO comparison model |
-| [assembly notebook](ipynb/01_assemble_phfno.ipynb) | Worked example and short training loop |
+| [assembly notebook](ipynb/assemble_phfno.ipynb) | Worked example and short training loop |
 | [tests/](tests/) | Small checks of the mathematics and gradient flow |
 
 ## Run it
@@ -178,8 +189,8 @@ Use float32 for the FNO. During evaluation, use `model.eval()` with
 The tests cover Fourier normalization, projection, multidimensional inputs,
 energy identities, gradients through every network, and short rollouts. They
 also check the synthetic flow generators, prescribed forcing, viscous terms,
-observation noise, and saved data. All 82 tests passed in about 3 seconds with
-CUDA available. The assembly notebook was also executed successfully.
+observation noise, and saved data. The experiment tests check trajectory splits,
+checkpoint selection, training, physical diagnostics, and plotting.
 
 ## Synthetic 3D flow data
 
