@@ -118,6 +118,7 @@ def test_field_slices_share_scales_and_default_to_first_seed(results):
 def test_summary_counts_only_runs_that_reached_the_target(results):
     figure = summary_table(results)
     try:
+        assert not figure.axes[0].texts
         table = figure.axes[0].tables[0]
         assert table[1, 4].get_text().get_text() == "1 / 2"
         assert table[1, 5].get_text().get_text() == "20"

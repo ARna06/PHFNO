@@ -185,7 +185,6 @@ def summary_table(results):
         elif column == 0:
             cell.set_text_props(color=COLORS[rows[row - 1][0]], weight="bold")
     ax.set_title("Comparison summary · mean ± standard deviation across seeds", fontsize=14, pad=12)
-    ax.text(0.5, 0.04, "Final rollout errors average the flow types within each seed. Parameter counts include real and imaginary components.", transform=ax.transAxes, ha="center", fontsize=9, color="#555555")
     return fig
 
 

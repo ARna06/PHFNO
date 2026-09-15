@@ -149,6 +149,32 @@ def test_training_progress_reports_the_model_seed_and_validation(enabled, capsys
         assert output == ""
 
 
+def test_training_updates_one_notebook_progress_widget(monkeypatch, capsys):
+    widgets = pytest.importorskip("ipywidgets")
+    from tqdm.notebook import tqdm as notebook_tqdm
+
+    created = []
+
+    def create_progress(*args, **kwargs):
+        progress = notebook_tqdm(*args, **kwargs)
+        created.append(progress)
+        return progress
+
+    monkeypatch.setattr("experiments.comparison.tqdm", create_progress)
+    training = prepare_transitions({"sample": sample_data()}, [0, 1], "cpu")
+    validation = prepare_transitions({"sample": sample_data()}, [2], "cpu")
+    config = small_config(progress=True)
+    train_model(ScalarModel(), training, validation, config, 7, 1.0, 0.1)
+    assert len(created) == 1
+    progress = created[0]
+    assert progress.n == progress.total == config.steps
+    bars = [child for child in progress.container.children if isinstance(child, widgets.FloatProgress)]
+    assert len(bars) == 1
+    assert bars[0].value == config.steps
+    assert "validation" in progress.postfix
+    assert "3/3" not in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("name", ["PHFNO", "FNO"])
 def test_model_snapshots_are_independent_and_load_strictly(name):
     model = build_model(name, small_config(), (8, 8, 8))
