@@ -56,9 +56,9 @@ The conjugate-pair condition ensures that the reconstructed field is real. Only 
 
 $$
 \begin{aligned}
-E_Nv &= \operatorname{concat}_{c=1}^{c_v}\Bigl[\widehat{v}_c(0), \\
-&\qquad \bigl(\sqrt{2}\operatorname{Re}\widehat{v}_c(k),
-\sqrt{2}\operatorname{Im}\widehat{v}_c(k)\bigr)_{k\in\Lambda_N^+}\Bigr].
+E_Nv &= \texttt{concat}_{c=1}^{c_v}\Bigl[\widehat{v}_c(0), \\
+&\qquad \bigl(\sqrt{2}\text{Re}\widehat{v}_c(k),
+\sqrt{2}\text{Im}\widehat{v}_c(k)\bigr)_{k\in\Lambda_N^+}\Bigr].
 \end{aligned}
 $$
 
