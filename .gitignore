@@ -1,0 +1,9 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+build/
+dist/
+/implementation.md
+/synthetic_data.md
