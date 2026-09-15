@@ -7,3 +7,4 @@ build/
 dist/
 /implementation.md
 /synthetic_data.md
+/datasets/**/*.pt

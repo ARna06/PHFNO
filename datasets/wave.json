@@ -1,0 +1,102 @@
+{
+  "format_version": 1,
+  "kind": "wave",
+  "equation": "incompressible Navier-Stokes with prescribed forcing",
+  "domain": [
+    [
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "periodic": true,
+  "endpoint_included": false,
+  "grid_size": 16,
+  "n_trajectories": 4,
+  "n_snapshots": 21,
+  "final_time": 1.0,
+  "viscosity": 0.01,
+  "dissipation_operator": "viscosity * Laplacian(velocity)",
+  "initial_rms": 0.2,
+  "forcing_amplitude": 0.1,
+  "forcing_frequency": 1.0,
+  "forcing_wavevector": [
+    2,
+    3,
+    1
+  ],
+  "forcing_polarization": [
+    0.4472135954999579,
+    0.0,
+    -0.8944271909999159
+  ],
+  "forcing_basis_rms": 1.0,
+  "forcing_time_profile": "amplitude * cos(2*pi*frequency*t), held at each interval's left endpoint",
+  "initial_random_cutoff": null,
+  "wavevector": [
+    2,
+    3,
+    1
+  ],
+  "method": "exact forced mode evolution",
+  "dealiasing": "none needed",
+  "max_dt": null,
+  "cfl": null,
+  "noise_level": 0.01,
+  "noise_reference": "initial per-trajectory RMS over components and space",
+  "noise_type": "independent Gaussian",
+  "noise_projection": null,
+  "noise_sigma_convention": "standard deviation before optional projection",
+  "seed": 42,
+  "noise_seed": 43,
+  "generation_device": "cuda",
+  "generation_dtype": "torch.float64",
+  "stored_dtype": "torch.float32",
+  "torch_version": "2.11.0+cu128",
+  "shape": [
+    4,
+    21,
+    3,
+    16,
+    16,
+    16
+  ],
+  "noise_sigma": [
+    0.0020000000949949026,
+    0.0020000000949949026,
+    0.0020000000949949026,
+    0.0020000000949949026
+  ],
+  "max_divergence_rms": 6.280723710005987e-07,
+  "initial_kinetic_energy": [
+    0.06000000238418579,
+    0.06000000238418579,
+    0.06000000238418579,
+    0.06000000238418579
+  ],
+  "final_kinetic_energy": [
+    7.493978773709387e-05,
+    7.47724698157981e-05,
+    7.161209941841662e-05,
+    7.51198676880449e-05
+  ],
+  "initial_dissipation_rate": [
+    0.6632373332977295,
+    0.6632372736930847,
+    0.6632372736930847,
+    0.6632372736930847
+  ],
+  "mean_input_power": [
+    0.0066178119741380215,
+    0.006548155099153519,
+    0.005232326686382294,
+    0.006692791823297739
+  ]
+}

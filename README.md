@@ -158,7 +158,7 @@ or establish that either architecture performs better.
 
 Select the **research** kernel in the notebook. It already adds `src/` to its
 import path. The local environment uses PyTorch `2.11.0+cu128` and
-`neuraloperator==2.0.0`; validation was run on CPU.
+`neuraloperator==2.0.0`; validation covers CPU and CUDA.
 
 ```bash
 conda activate research
@@ -175,6 +175,25 @@ Use float32 for the FNO. During evaluation, use `model.eval()` with
 `torch.no_grad()`. The energy gradient is computed locally inside that context;
 `torch.inference_mode()` disables the differentiation it needs.
 
-The 18 unit tests passed in about 2 seconds. They cover Fourier normalization,
-projection, 1D and 2D inputs, the energy identity, gradients through every network,
-and short rollouts. All notebook cells also executed successfully.
+The tests cover Fourier normalization, projection, multidimensional inputs,
+energy identities, gradients through every network, and short rollouts. They
+also check the synthetic flow generators, prescribed forcing, viscous terms,
+observation noise, and saved data. All 82 tests passed in about 3 seconds with
+CUDA available. The assembly notebook was also executed successfully.
+
+## Synthetic 3D flow data
+
+The `nsdata` package generates exact forced waves, Taylor–Green flows, and random
+smooth divergence-free flows on the unit periodic cube. The datasets contain
+clean and noisy velocities, scalar controls, external forcing, viscous terms,
+and energy diagnostics. The [dataset guide](datasets/README.md) describes the
+equations, tensor shapes, and generation options.
+
+```bash
+PYTHONPATH=src python -m nsdata --kind all --output-dir datasets
+```
+
+By default, this creates four trajectories per kind on a `16³` grid, with 21
+snapshots over times zero to one. Generation uses CUDA by default; pass
+`--device cpu` for small CPU checks. Use three state channels and one
+control channel when connecting these data to either model.
