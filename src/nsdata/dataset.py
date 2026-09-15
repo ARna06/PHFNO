@@ -20,7 +20,7 @@ def resolve_device(device="cuda"):
     return device
 
 
-def add_observation_noise(clean, noise_level=0.01, seed=0, projector=None):
+def add_observation_noise(clean, noise_level=0.1, seed=0, projector=None):
     if not math.isfinite(noise_level) or noise_level < 0:
         raise ValueError("noise_level must be finite and nonnegative")
     if clean.ndim != 6 or clean.shape[2] != 3:
