@@ -1,0 +1,2112 @@
+{
+  "format_version": 1,
+  "final_time": 20.0,
+  "dt": 0.025,
+  "n_snapshots": 801,
+  "dataset_sha256": {
+    "wave": "b8e526936a633281aa02922be5bafc7e34c61b3c44fd1c7b32de14c8af3bc88f",
+    "taylor_green": "69d7118a151a42045c0ed3eac0e911deff96c2bb8b3d5cea2fe193504f82b14c",
+    "random": "8312d9ee5213bcfeaac46ac9a10c59665fbee56669d721f1b072e836b726de4e"
+  },
+  "checkpoint_sha256": {
+    "velocity/PHFNO_7": "18b68fa3fe245a052863483164581fb8f476f4f51162246f79e536e9673131df",
+    "velocity/PHFNO_17": "ca17025ca402f7eaff3309f5c9d35f083530a9f47dfb8fe37ea6fd5ac9dc2efd",
+    "velocity/PHFNO_27": "7214e943109fc1d0da3e336845ca218df618ba4feff6dabf172687641fa125d9",
+    "velocity/FNO_7": "6d1fbc780b4bb9cb36ed233a893aa676313a06e0810f9c6868b5383dde1fedec",
+    "velocity/FNO_17": "daeb87a7561dd8109da8c7d7fb5371228bd1a5a22331c948b2e32b9c31306643",
+    "velocity/FNO_27": "60a97f9b304ccf5cca942b0aee04033c1a45757eafb70f424e3bd832d7c47743",
+    "vorticity/PHFNO_7": "4228487d02badf4597320a5d5e9594a9cf5d1957acf8d35a7bd2335c9e588433",
+    "vorticity/PHFNO_17": "c1e06076f00499ba6b1fad8c6eafdb41b0f3bc08218281e1e7a3f69b247dcd57",
+    "vorticity/PHFNO_27": "a9700f7321bf969fc18b1ab671cd5d5ce55d96b661fc1ea553bb7c450d95c20f",
+    "vorticity/FNO_7": "7891bc8e96f35554443f78b140f99f3a8a53b502fdf07eaf69b29a35c7d0f791",
+    "vorticity/FNO_17": "1346ef67692e3dc55888e2366d1c7330bb50398776c42a5d9148a10277bdd563",
+    "vorticity/FNO_27": "374156ac07366f608f50ae88a65e045314df92764a5d88994842b62c5e4f8338"
+  },
+  "summary_sha256": {
+    "velocity": "12e703d8a5872efac9f4be4b9e9aa45cae04afe66c1b54d379aa3728d7b9ec52",
+    "vorticity": "530301f3dd0bfa2ce8a5aba1e82916e051f51f6bb8f50298785900f1865bc282"
+  },
+  "test_indices": [
+    28,
+    29,
+    30,
+    31
+  ],
+  "seeds": [
+    7,
+    17,
+    27
+  ],
+  "families": [
+    "wave",
+    "taylor_green",
+    "random"
+  ],
+  "device": "cuda:0",
+  "hardware": "NVIDIA H100 NVL",
+  "torch_version": "2.11.0+cu128",
+  "reference_dtype": "torch.float64",
+  "model_dtype": "torch.float32",
+  "diagnostic_dtype": "torch.float64",
+  "integrators": {
+    "PHFNO": "Gonzalez (checkpoint default)",
+    "FNO": "Euler (checkpoint default)"
+  },
+  "protocol": "Clean held-out t=0; autonomous recurrence with prescribed left-endpoint forcing; no resets",
+  "error_normalization": "Per-trajectory initial componentwise velocity RMS",
+  "failure_policy": "Record nonfinite states or Gonzalez nonconvergence per trajectory; no restart; NaN tail",
+  "aggregation": "Equal weight for trajectories and seeds; no omission of failed trajectories",
+  "references": {
+    "wave": {
+      "path": "references/wave.pt",
+      "metadata": {
+        "format_version": 1,
+        "kind": "wave",
+        "equation": "incompressible Navier-Stokes with prescribed forcing",
+        "domain": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ],
+        "periodic": true,
+        "endpoint_included": false,
+        "grid_size": 24,
+        "n_trajectories": 4,
+        "n_snapshots": 801,
+        "final_time": 20.0,
+        "viscosity": 0.01,
+        "dissipation_operator": "viscosity * Laplacian(velocity)",
+        "initial_rms": 0.2,
+        "forcing_amplitude": 0.1,
+        "forcing_frequency": 1.0,
+        "forcing_wavevector": [
+          2,
+          3,
+          1
+        ],
+        "forcing_polarization": [
+          0.4472135954999579,
+          0.0,
+          -0.8944271909999159
+        ],
+        "forcing_basis_rms": 1.0,
+        "forcing_time_profile": "amplitude * cos(2*pi*frequency*t), held at each interval's left endpoint",
+        "initial_random_cutoff": null,
+        "wavevector": [
+          2,
+          3,
+          1
+        ],
+        "method": "exact forced mode evolution",
+        "dealiasing": "none needed",
+        "max_dt": null,
+        "cfl": null,
+        "noise_level": 0.0,
+        "noise_reference": "initial per-trajectory RMS over components and space",
+        "noise_type": "none",
+        "noise_projection": null,
+        "noise_sigma_convention": "standard deviation before optional projection",
+        "seed": 142,
+        "noise_seed": null,
+        "generation_device": "cuda:0",
+        "generation_dtype": "torch.float64",
+        "stored_dtype": "torch.float32",
+        "torch_version": "2.11.0+cu128",
+        "dt": 0.025,
+        "initial_state_source": "saved held-out clean velocity at t=0",
+        "overlap_max_nrmse": 5.053610968889059e-08
+      }
+    },
+    "taylor_green": {
+      "path": "references/taylor_green.pt",
+      "metadata": {
+        "format_version": 1,
+        "kind": "taylor_green",
+        "equation": "incompressible Navier-Stokes with prescribed forcing",
+        "domain": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ],
+        "periodic": true,
+        "endpoint_included": false,
+        "grid_size": 24,
+        "n_trajectories": 4,
+        "n_snapshots": 801,
+        "final_time": 20.0,
+        "viscosity": 0.01,
+        "dissipation_operator": "viscosity * Laplacian(velocity)",
+        "initial_rms": 0.2,
+        "forcing_amplitude": 0.1,
+        "forcing_frequency": 1.0,
+        "forcing_wavevector": [
+          2,
+          3,
+          1
+        ],
+        "forcing_polarization": [
+          0.4472135954999579,
+          0.0,
+          -0.8944271909999159
+        ],
+        "forcing_basis_rms": 1.0,
+        "forcing_time_profile": "amplitude * cos(2*pi*frequency*t), held at each interval's left endpoint",
+        "initial_random_cutoff": null,
+        "wavevector": null,
+        "method": "Fourier projection with RK4",
+        "dealiasing": "strict two-thirds truncation",
+        "max_dt": 0.005,
+        "cfl": 0.4,
+        "noise_level": 0.0,
+        "noise_reference": "initial per-trajectory RMS over components and space",
+        "noise_type": "none",
+        "noise_projection": null,
+        "noise_sigma_convention": "standard deviation before optional projection",
+        "seed": 142,
+        "noise_seed": null,
+        "generation_device": "cuda:0",
+        "generation_dtype": "torch.float64",
+        "stored_dtype": "torch.float32",
+        "torch_version": "2.11.0+cu128",
+        "dt": 0.025,
+        "initial_state_source": "saved held-out clean velocity at t=0",
+        "overlap_max_nrmse": 2.1001424467710027e-08
+      }
+    },
+    "random": {
+      "path": "references/random.pt",
+      "metadata": {
+        "format_version": 1,
+        "kind": "random",
+        "equation": "incompressible Navier-Stokes with prescribed forcing",
+        "domain": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ],
+        "periodic": true,
+        "endpoint_included": false,
+        "grid_size": 24,
+        "n_trajectories": 4,
+        "n_snapshots": 801,
+        "final_time": 20.0,
+        "viscosity": 0.01,
+        "dissipation_operator": "viscosity * Laplacian(velocity)",
+        "initial_rms": 0.2,
+        "forcing_amplitude": 0.1,
+        "forcing_frequency": 1.0,
+        "forcing_wavevector": [
+          2,
+          3,
+          1
+        ],
+        "forcing_polarization": [
+          0.4472135954999579,
+          0.0,
+          -0.8944271909999159
+        ],
+        "forcing_basis_rms": 1.0,
+        "forcing_time_profile": "amplitude * cos(2*pi*frequency*t), held at each interval's left endpoint",
+        "initial_random_cutoff": 2,
+        "wavevector": null,
+        "method": "Fourier projection with RK4",
+        "dealiasing": "strict two-thirds truncation",
+        "max_dt": 0.005,
+        "cfl": 0.4,
+        "noise_level": 0.0,
+        "noise_reference": "initial per-trajectory RMS over components and space",
+        "noise_type": "none",
+        "noise_projection": null,
+        "noise_sigma_convention": "standard deviation before optional projection",
+        "seed": 142,
+        "noise_seed": null,
+        "generation_device": "cuda:0",
+        "generation_dtype": "torch.float64",
+        "stored_dtype": "torch.float32",
+        "torch_version": "2.11.0+cu128",
+        "dt": 0.025,
+        "initial_state_source": "saved held-out clean velocity at t=0",
+        "overlap_max_nrmse": 1.9808718025215723e-08
+      }
+    }
+  },
+  "runs": [
+    {
+      "model": "PHFNO",
+      "seed": 7,
+      "representation": "velocity",
+      "best_step": 2800,
+      "best_validation_nrmse": 0.0194032085822811,
+      "checkpoint_sha256": "18b68fa3fe245a052863483164581fb8f476f4f51162246f79e536e9673131df",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_7_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03759929345296446,
+            "t=5": 0.03889532062751269,
+            "t=10": 0.03889498134092837,
+            "t=20": 0.03889062984534131
+          },
+          "kinetic_energy": {
+            "t=1": 1.3987112392838553e-05,
+            "t=5": 1.3990928492058094e-05,
+            "t=10": 1.3989372426302145e-05,
+            "t=20": 1.3969217391013036e-05
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.006586116015066175,
+            "t=5": 9.593327896948794e-05,
+            "t=10": 0.0001691161119005112,
+            "t=20": 0.0002705266373827995
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_7_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04782768432643711,
+            "t=5": 0.03907157189293972,
+            "t=10": 0.03900948416186582,
+            "t=20": 0.039013204787915416
+          },
+          "kinetic_energy": {
+            "t=1": 0.005143337891004763,
+            "t=5": 1.5180877610082395e-05,
+            "t=10": 1.4525441437164985e-05,
+            "t=20": 1.4542957465379077e-05
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.03193511529354992,
+            "t=5": 0.004123713458887805,
+            "t=10": 0.0036412705960964962,
+            "t=20": 0.0039052202918773643
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_7_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.07974241959135561,
+            "t=5": 0.05927608751992021,
+            "t=10": 0.05690996098257585,
+            "t=20": 0.05674189139687424
+          },
+          "kinetic_energy": {
+            "t=1": 0.004233868619530644,
+            "t=5": 0.00020684165343571697,
+            "t=10": 0.0001350960774093985,
+            "t=20": 0.00013393555892238104
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.1124113120454955,
+            "t=5": 0.018541839532497707,
+            "t=10": 0.013190588621625267,
+            "t=20": 0.011802465087393766
+          }
+        }
+      }
+    },
+    {
+      "model": "PHFNO",
+      "seed": 17,
+      "representation": "velocity",
+      "best_step": 3000,
+      "best_validation_nrmse": 0.01833438138330701,
+      "checkpoint_sha256": "ca17025ca402f7eaff3309f5c9d35f083530a9f47dfb8fe37ea6fd5ac9dc2efd",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_17_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.036856759637316036,
+            "t=5": 0.03587411827926193,
+            "t=10": 0.03587912369673226,
+            "t=20": 0.03589270971377075
+          },
+          "kinetic_energy": {
+            "t=1": 1.1199544823746398e-05,
+            "t=5": 4.390105618976228e-07,
+            "t=10": 4.579208136089457e-07,
+            "t=20": 5.183025809841556e-07
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.012264696457652269,
+            "t=5": 0.00016917459054206115,
+            "t=10": 0.0002699395101293527,
+            "t=20": 0.002397148257522836
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_17_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.0430147928495675,
+            "t=5": 0.036709909685428165,
+            "t=10": 0.03746974239653299,
+            "t=20": 0.09752843636129543
+          },
+          "kinetic_energy": {
+            "t=1": 0.004554823618207438,
+            "t=5": 4.3771763131711635e-06,
+            "t=10": 7.460305981057874e-06,
+            "t=20": 0.0004939814105999244
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.03591661980985229,
+            "t=5": 0.02200891021194254,
+            "t=10": 0.06122947369067343,
+            "t=20": 0.5384325039650852
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_17_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.09421176935103791,
+            "t=5": 0.09449677042491275,
+            "t=10": 0.09821276394445932,
+            "t=20": 0.313525785176789
+          },
+          "kinetic_energy": {
+            "t=1": 0.004215352668565153,
+            "t=5": 0.0006412599305241934,
+            "t=10": 0.0006289337327784043,
+            "t=20": 0.006733859872606788
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.1345837515900686,
+            "t=5": 0.07361009042730528,
+            "t=10": 0.19702942073533705,
+            "t=20": 1.790029406826294
+          }
+        }
+      }
+    },
+    {
+      "model": "PHFNO",
+      "seed": 27,
+      "representation": "velocity",
+      "best_step": 3000,
+      "best_validation_nrmse": 0.01918632193633712,
+      "checkpoint_sha256": "7214e943109fc1d0da3e336845ca218df618ba4feff6dabf172687641fa125d9",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_27_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03687971662095076,
+            "t=5": 0.03726443114826575,
+            "t=10": 0.03976791660955534,
+            "t=20": 0.05054987302152728
+          },
+          "kinetic_energy": {
+            "t=1": 9.254305013130221e-06,
+            "t=5": 6.576923036570927e-06,
+            "t=10": 1.8188495530203126e-05,
+            "t=20": 7.67193801413432e-05
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.008981284401306137,
+            "t=5": 0.0014204606900546934,
+            "t=10": 0.0015679840007454295,
+            "t=20": 0.0019120828670019178
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_27_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04968503952445191,
+            "t=5": 0.04088378926189961,
+            "t=10": 0.04069333055502744,
+            "t=20": 0.047413181042731276
+          },
+          "kinetic_energy": {
+            "t=1": 0.004242882985815603,
+            "t=5": 2.4222570130141773e-05,
+            "t=10": 2.327359417751252e-05,
+            "t=20": 6.332810258450961e-05
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.05237343617674632,
+            "t=5": 0.011355995979969153,
+            "t=10": 0.012689664849788144,
+            "t=20": 0.0356931424221439
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/PHFNO_27_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.11527688184198401,
+            "t=5": 0.08078800597214009,
+            "t=10": 0.07612700524093625,
+            "t=20": 0.14354973553159978
+          },
+          "kinetic_energy": {
+            "t=1": 0.004187018304173259,
+            "t=5": 0.00046291398417447663,
+            "t=10": 0.00036476206513204497,
+            "t=20": 0.0012797148774997542
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.16946980971671338,
+            "t=5": 0.0803395641131823,
+            "t=10": 0.1319334368404116,
+            "t=20": 0.5208020460355176
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 7,
+      "representation": "velocity",
+      "best_step": 2900,
+      "best_validation_nrmse": 0.018690159898181406,
+      "checkpoint_sha256": "6d1fbc780b4bb9cb36ed233a893aa676313a06e0810f9c6868b5383dde1fedec",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_7_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03731378268698519,
+            "t=5": 0.036302758538089265,
+            "t=10": 0.03630308076202665,
+            "t=20": 0.0363030878156904
+          },
+          "kinetic_energy": {
+            "t=1": 1.1391998298861359e-05,
+            "t=5": 2.2947649657255916e-06,
+            "t=10": 2.295015651134052e-06,
+            "t=20": 2.295028529323224e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.0038337107657771593,
+            "t=5": 1.3729536759279644e-05,
+            "t=10": 2.2787860915599336e-05,
+            "t=20": 1.8240019323514155e-05
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_7_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04099703544241286,
+            "t=5": 0.036874701982080954,
+            "t=10": 0.03632143810361342,
+            "t=20": 0.036303772467604106
+          },
+          "kinetic_energy": {
+            "t=1": 0.0046883923957574455,
+            "t=5": 4.978555673996676e-06,
+            "t=10": 2.3750423686006472e-06,
+            "t=20": 2.2980089611980715e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.035677884041389024,
+            "t=5": 0.00990390903786801,
+            "t=10": 0.0024201035844244635,
+            "t=20": 0.00032031463128441486
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_7_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.07918899037695715,
+            "t=5": 0.045104084489270155,
+            "t=10": 0.04204428281850538,
+            "t=20": 0.10992068071546238
+          },
+          "kinetic_energy": {
+            "t=1": 0.00402071121897825,
+            "t=5": 9.762706194005323e-05,
+            "t=10": 3.0782225513394353e-05,
+            "t=20": 0.0007302300157984714
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.15763952013644442,
+            "t=5": 0.046802517506047414,
+            "t=10": 0.06437418194308758,
+            "t=20": 0.3783419993536223
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 17,
+      "representation": "velocity",
+      "best_step": 2900,
+      "best_validation_nrmse": 0.02017140691637135,
+      "checkpoint_sha256": "daeb87a7561dd8109da8c7d7fb5371228bd1a5a22331c948b2e32b9c31306643",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_17_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.036266173028711275,
+            "t=5": 0.036277096293525074,
+            "t=10": 0.036277380294146844,
+            "t=20": 0.03627739189819897
+          },
+          "kinetic_energy": {
+            "t=1": 4.28702629819734e-06,
+            "t=5": 2.181716131662609e-06,
+            "t=10": 2.1831166110201222e-06,
+            "t=20": 2.1830664889056543e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.005604482803619936,
+            "t=5": 3.65605903519468e-05,
+            "t=10": 3.591120855306397e-05,
+            "t=20": 3.7707761540514206e-05
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_17_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04078116547527872,
+            "t=5": 0.036307154587596466,
+            "t=10": 0.03628872901850786,
+            "t=20": 0.03631663863217162
+          },
+          "kinetic_energy": {
+            "t=1": 0.0047203401396981514,
+            "t=5": 2.676078104505564e-06,
+            "t=10": 2.2324218323138626e-06,
+            "t=20": 2.353955670679872e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.029384901018422137,
+            "t=5": 0.0055759990287877325,
+            "t=10": 0.005611935007053163,
+            "t=20": 0.011480698673702536
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_17_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.07195368160141616,
+            "t=5": 0.04605998722585566,
+            "t=10": 0.03676159072850234,
+            "t=20": 0.03699623509430135
+          },
+          "kinetic_energy": {
+            "t=1": 0.0037813119215634396,
+            "t=5": 6.080285445593582e-05,
+            "t=10": 4.163642969832694e-06,
+            "t=20": 5.363254141668717e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.09330242797121617,
+            "t=5": 0.020104892241779783,
+            "t=10": 0.02188053200906248,
+            "t=20": 0.044163638478277416
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 27,
+      "representation": "velocity",
+      "best_step": 2900,
+      "best_validation_nrmse": 0.019737225755382393,
+      "checkpoint_sha256": "60a97f9b304ccf5cca942b0aee04033c1a45757eafb70f424e3bd832d7c47743",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_27_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03667706227531497,
+            "t=5": 0.036171836524137344,
+            "t=10": 0.03617173102281451,
+            "t=20": 0.03617180966381381
+          },
+          "kinetic_energy": {
+            "t=1": 7.251473679688684e-06,
+            "t=5": 1.724153482503401e-06,
+            "t=10": 1.7238879779049495e-06,
+            "t=20": 1.723864053193e-06
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.005267813723974843,
+            "t=5": 2.583123761438377e-05,
+            "t=10": 2.2612299315458513e-05,
+            "t=20": 2.2964873278752035e-05
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_27_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04086175699708955,
+            "t=5": 0.03629751554211169,
+            "t=10": 0.03669857655700861,
+            "t=20": 0.061672183588218216
+          },
+          "kinetic_energy": {
+            "t=1": 0.004704855560453393,
+            "t=5": 2.637353351006626e-06,
+            "t=10": 4.027255444814807e-06,
+            "t=20": 0.00015142770379460857
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.027652237032359903,
+            "t=5": 0.014570818355453721,
+            "t=10": 0.03767825744526939,
+            "t=20": 0.30505097423119876
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "velocity/FNO_27_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.07236624875125536,
+            "t=5": 0.042491717867179896,
+            "t=10": 0.04663440615166711,
+            "t=20": 0.2125456759748105
+          },
+          "kinetic_energy": {
+            "t=1": 0.004319478730453507,
+            "t=5": 0.00014337461591195055,
+            "t=10": 5.8474138063390117e-05,
+            "t=20": 0.0028712224957618297
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 0.1342837620182161,
+            "t=5": 0.06600960395335051,
+            "t=10": 0.1686438277127203,
+            "t=20": 1.28062554498805
+          }
+        }
+      }
+    },
+    {
+      "model": "PHFNO",
+      "seed": 7,
+      "representation": "vorticity",
+      "best_step": 2900,
+      "best_validation_nrmse": 0.0353458536982299,
+      "checkpoint_sha256": "4228487d02badf4597320a5d5e9594a9cf5d1957acf8d35a7bd2335c9e588433",
+      "test": {
+        "wave": {
+          "failures": [
+            {
+              "trajectory_index": 28,
+              "step": 365,
+              "time": 9.125,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 733,
+              "time": 18.325,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 786,
+              "time": 19.650000000000002,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 1.554e+03)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_7_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.11520128652094858,
+            "t=5": 1.0338724265224732,
+            "t=10": null,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.00107812382444734,
+            "t=5": 0.22794593183805884,
+            "t=10": null,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 9.94360107350861e-08,
+            "t=5": 1.1451624390071173e-06,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.24259539791332735,
+            "t=5": 1.2367260415457895,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.2026916868642117,
+            "t=5": 0.701355929363259,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 4.783446056100367,
+            "t=5": 93.13412218140687,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 1.6351516373005133,
+            "t=5": 3.9898341503012467,
+            "t=10": null,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 2.0031676506290896,
+            "t=5": 152.4665254653011,
+            "t=10": null,
+            "t=20": null
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "vorticity/PHFNO_7_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.05425176634077533,
+            "t=5": 0.0362857423004155,
+            "t=10": 0.08803381719806104,
+            "t=20": 6.553063129487889
+          },
+          "kinetic_energy": {
+            "t=1": 0.00547497938295528,
+            "t=5": 2.768879899143097e-06,
+            "t=10": 0.0005361502480205029,
+            "t=20": 4.1762639931897105
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.7457065102277293e-07,
+            "t=5": 7.926579451697824e-09,
+            "t=10": 8.139845110063497e-08,
+            "t=20": 6.846451461366531e-06
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.12082113025096615,
+            "t=5": 0.16207193046796442,
+            "t=10": 0.817825672638169,
+            "t=20": 19.340608037191416
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.06617166040084493,
+            "t=5": 0.13514854047299826,
+            "t=10": 0.7877570690785545,
+            "t=20": 15.270613625999648
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.7157258510523632,
+            "t=5": 1.0746639822111645,
+            "t=10": 88.1137923804678,
+            "t=20": 1066.8849803176558
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.24353444516708894,
+            "t=5": 0.5062239174333688,
+            "t=10": 1.2582269838824385,
+            "t=20": 45.242993029603326
+          },
+          "enstrophy": {
+            "t=1": 0.7543296485088032,
+            "t=5": 0.1898344465780612,
+            "t=10": 6.59711872045695,
+            "t=20": 3339.524562568029
+          }
+        },
+        "random": {
+          "failures": [
+            {
+              "trajectory_index": 30,
+              "step": 206,
+              "time": 5.15,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 373,
+              "time": 9.325000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 4.138e+07)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 522,
+              "time": 13.05,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 535,
+              "time": 13.375,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_7_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.19394124341098556,
+            "t=5": 14.27214275336451,
+            "t=10": null,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.005977987894538225,
+            "t=5": 45.72333913370277,
+            "t=10": null,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.9551770971111544e-07,
+            "t=5": 1.7692201352153964e-05,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.2164697062939566,
+            "t=5": 46.45051859899912,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.11618837849740957,
+            "t=5": 29.996579705028083,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 5.779262740671303,
+            "t=5": 5880.789313105115,
+            "t=10": null,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.5168464283399098,
+            "t=5": 120.45663621583064,
+            "t=10": null,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.9592967824902379,
+            "t=5": 117805.44373697088,
+            "t=10": null,
+            "t=20": null
+          }
+        }
+      }
+    },
+    {
+      "model": "PHFNO",
+      "seed": 17,
+      "representation": "vorticity",
+      "best_step": 1600,
+      "best_validation_nrmse": 0.035729957882474364,
+      "checkpoint_sha256": "c1e06076f00499ba6b1fad8c6eafdb41b0f3bc08218281e1e7a3f69b247dcd57",
+      "test": {
+        "wave": {
+          "failures": [
+            {
+              "trajectory_index": 30,
+              "step": 455,
+              "time": 11.375,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 455,
+              "time": 11.375,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 465,
+              "time": 11.625,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 1.226e+05)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 472,
+              "time": 11.8,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_17_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03570703644960874,
+            "t=5": 0.03598841284708505,
+            "t=10": 0.5816875768932999,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 1.18521441700903e-05,
+            "t=5": 8.746595378666668e-07,
+            "t=10": 0.02061666864127864,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 1.3450851520688945e-08,
+            "t=5": 4.079864057267718e-09,
+            "t=10": 6.552729489754154e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.06593632721416964,
+            "t=5": 0.31122074715672526,
+            "t=10": 1.1506368663189872,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.05525820256634756,
+            "t=5": 0.3091414205687741,
+            "t=10": 1.0260832583060189,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.21927302187248515,
+            "t=5": 0.4214640222243734,
+            "t=10": 19.407365263753476,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.44997750509139167,
+            "t=5": 2.517601632976495,
+            "t=10": 8.312938276872941,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.11200871172939408,
+            "t=5": 3.1745690997723575,
+            "t=10": 43.951996307105894,
+            "t=20": null
+          }
+        },
+        "taylor_green": {
+          "failures": [
+            {
+              "trajectory_index": 28,
+              "step": 453,
+              "time": 11.325000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 619,
+              "time": 15.475000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 9.677e+04)"
+            },
+            {
+              "trajectory_index": 30,
+              "step": 654,
+              "time": 16.35,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 1.447e+04)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 682,
+              "time": 17.05,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 1.058e+02)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_17_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.0742339503690296,
+            "t=5": 0.04348452097879352,
+            "t=10": 0.41124210009663753,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.005508305607004502,
+            "t=5": 4.568872897516187e-05,
+            "t=10": 0.017495220857914606,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.747769930779621e-07,
+            "t=5": 2.2552825223919222e-08,
+            "t=10": 4.665001478994386e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.14315144457148382,
+            "t=5": 0.5934891756049675,
+            "t=10": 2.1558590396606476,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.08299126313796001,
+            "t=5": 0.5865398310058155,
+            "t=10": 1.9728768732367779,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.8605841429406083,
+            "t=5": 1.3257630601287917,
+            "t=10": 30.238135006488164,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.30457568794110046,
+            "t=5": 2.2098122334425234,
+            "t=10": 7.310047767415497,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.7920181146715597,
+            "t=5": 2.5891879262959314,
+            "t=10": 40.93865603046573,
+            "t=20": null
+          }
+        },
+        "random": {
+          "failures": [
+            {
+              "trajectory_index": 30,
+              "step": 521,
+              "time": 13.025,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 2.908e+14)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 584,
+              "time": 14.600000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 6.504e+04)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 586,
+              "time": 14.65,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 2.561e+02)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 635,
+              "time": 15.875,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_17_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.1607940988827846,
+            "t=5": 0.10368432078603057,
+            "t=10": 0.4033100063264876,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.004531972416591396,
+            "t=5": 0.000708501895827058,
+            "t=10": 0.011292653668247762,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.5668382425821873e-07,
+            "t=5": 9.327178622351624e-08,
+            "t=10": 3.74119105670639e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.17661758108926426,
+            "t=5": 0.4059044585096703,
+            "t=10": 1.1750619104509443,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.06514919687119224,
+            "t=5": 0.39805181045103843,
+            "t=10": 1.0686049483466231,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 2.515343322719481,
+            "t=5": 1.6295640073404831,
+            "t=10": 27.983296476568064,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.3190023974602564,
+            "t=5": 2.109328677877569,
+            "t=10": 5.478900683777052,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.5075505292724487,
+            "t=5": 2.3084202667693905,
+            "t=10": 19.924950329595386,
+            "t=20": null
+          }
+        }
+      }
+    },
+    {
+      "model": "PHFNO",
+      "seed": 27,
+      "representation": "vorticity",
+      "best_step": 2900,
+      "best_validation_nrmse": 0.03445544685585437,
+      "checkpoint_sha256": "a9700f7321bf969fc18b1ab671cd5d5ce55d96b661fc1ea553bb7c450d95c20f",
+      "test": {
+        "wave": {
+          "failures": [
+            {
+              "trajectory_index": 29,
+              "step": 527,
+              "time": 13.175,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 538,
+              "time": 13.450000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_27_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.0671554919867873,
+            "t=5": 0.038275405629701185,
+            "t=10": 0.42239517147265715,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.0004490022118798095,
+            "t=5": 4.785001019311798e-06,
+            "t=10": 0.01983088457969929,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 6.720950383777022e-08,
+            "t=5": 5.522747667545838e-09,
+            "t=10": 2.788539572802004e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.16097260880455824,
+            "t=5": 0.17973550756064385,
+            "t=10": 1.0582944317486076,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.14002226870279166,
+            "t=5": 0.1663230243145875,
+            "t=10": 0.9739066765280976,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.6698098381745176,
+            "t=5": 0.1613476356294731,
+            "t=10": 14.749653357426618,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 1.1401231636969982,
+            "t=5": 1.3545046273170664,
+            "t=10": 7.914054797474895,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.9410946174114385,
+            "t=5": 1.6074316201520789,
+            "t=10": 63.52072765778085,
+            "t=20": null
+          }
+        },
+        "taylor_green": {
+          "failures": [
+            {
+              "trajectory_index": 31,
+              "step": 442,
+              "time": 11.05,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 1.056e+10)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 676,
+              "time": 16.900000000000002,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 29,
+              "step": 681,
+              "time": 17.025000000000002,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 30,
+              "step": 715,
+              "time": 17.875,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_27_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.062502343611479,
+            "t=5": 0.036270420914343904,
+            "t=10": 0.23481796694613324,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.0045955671643768976,
+            "t=5": 2.115702888940688e-06,
+            "t=10": 0.010356284952093099,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.438264416308306e-07,
+            "t=5": 5.793404635040972e-09,
+            "t=10": 1.4773500479768847e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.14966562575058776,
+            "t=5": 0.3634905580102326,
+            "t=10": 1.7904386260164658,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.10508014044902358,
+            "t=5": 0.3541175378227057,
+            "t=10": 1.7118979447506812,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.9514907072885422,
+            "t=5": 0.24264364359002458,
+            "t=10": 15.783595896192683,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.3883575532296428,
+            "t=5": 1.3349585574770109,
+            "t=10": 6.433274042964619,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 0.6999449750398223,
+            "t=5": 1.0210162692679672,
+            "t=10": 51.066101657034565,
+            "t=20": null
+          }
+        },
+        "random": {
+          "failures": [
+            {
+              "trajectory_index": 29,
+              "step": 472,
+              "time": 11.8,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 30,
+              "step": 537,
+              "time": 13.425,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual 4.665e+02)"
+            },
+            {
+              "trajectory_index": 28,
+              "step": 553,
+              "time": 13.825000000000001,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            },
+            {
+              "trajectory_index": 31,
+              "step": 630,
+              "time": 15.75,
+              "reason": "Gonzalez step did not converge after 50 iterations (residual nan)"
+            }
+          ],
+          "prediction_file": "vorticity/PHFNO_27_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.1919036632424878,
+            "t=5": 0.136105729689562,
+            "t=10": 0.5886594473071158,
+            "t=20": null
+          },
+          "kinetic_energy": {
+            "t=1": 0.0053746722222456494,
+            "t=5": 0.0011585543722009263,
+            "t=10": 0.03634029707552842,
+            "t=20": null
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.8623578844526174e-07,
+            "t=5": 1.0651631380822033e-07,
+            "t=10": 5.975941819733215e-07,
+            "t=20": null
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.24930261740440426,
+            "t=5": 0.28898004671610206,
+            "t=10": 1.8441025688136652,
+            "t=20": null
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.19092886767001632,
+            "t=5": 0.26883438405239357,
+            "t=10": 1.651883599587408,
+            "t=20": null
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 4.451471356775938,
+            "t=5": 10.685012354420241,
+            "t=10": 202.7550891898881,
+            "t=20": null
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.9846091389198661,
+            "t=5": 1.376721827318692,
+            "t=10": 6.379030950184306,
+            "t=20": null
+          },
+          "enstrophy": {
+            "t=1": 1.103406863700426,
+            "t=5": 1.463331039909907,
+            "t=10": 84.88963198940881,
+            "t=20": null
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 7,
+      "representation": "vorticity",
+      "best_step": 2800,
+      "best_validation_nrmse": 0.04082838902074239,
+      "checkpoint_sha256": "7891bc8e96f35554443f78b140f99f3a8a53b502fdf07eaf69b29a35c7d0f791",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_7_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03664835452614344,
+            "t=5": 0.0887669341375612,
+            "t=10": 0.19041854198439412,
+            "t=20": 3.876681770623163
+          },
+          "kinetic_energy": {
+            "t=1": 2.7520088607928565e-05,
+            "t=5": 0.00047209789946041434,
+            "t=10": 0.0020893006050292273,
+            "t=20": 0.9111107804364372
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.134369705305215e-08,
+            "t=5": 8.573439179087057e-08,
+            "t=10": 1.7966443620246079e-07,
+            "t=20": 4.629836820067382e-06
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.0896534145065979,
+            "t=5": 0.10203958572456326,
+            "t=10": 0.3276475108928376,
+            "t=20": 10.039851774748588
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.0801883908474989,
+            "t=5": 0.04804274902782424,
+            "t=10": 0.2653650078638694,
+            "t=20": 8.672510449494322
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.605824903474315,
+            "t=5": 2.963533035564537,
+            "t=10": 7.653716772479303,
+            "t=20": 1945.454166294388
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.6525555773577801,
+            "t=5": 0.3735970304584254,
+            "t=10": 2.1428165996089814,
+            "t=20": 31.524972381361476
+          },
+          "enstrophy": {
+            "t=1": 0.22846271847873134,
+            "t=5": 0.33766769441830624,
+            "t=10": 3.496588296639646,
+            "t=20": 3380.208907910492
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_7_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.12753074954925722,
+            "t=5": 0.3941676116631322,
+            "t=10": 1.5195266998982557,
+            "t=20": 616.056463886842
+          },
+          "kinetic_energy": {
+            "t=1": 0.004346192768741159,
+            "t=5": 0.009241221314972636,
+            "t=10": 0.13846067038233428,
+            "t=20": 22774.699500396033
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.3228770346704036e-07,
+            "t=5": 4.283714832323889e-07,
+            "t=10": 1.5739481954270404e-06,
+            "t=20": 0.0006426077302500244
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.5323141781624746,
+            "t=5": 1.1278299488112968,
+            "t=10": 5.053846901715517,
+            "t=20": 2392.027238323912
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.5060215484773538,
+            "t=5": 0.8850634490310405,
+            "t=10": 3.942905108259782,
+            "t=20": 1884.647580775405
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 2.6461362202745864,
+            "t=5": 44.26226076170002,
+            "t=10": 335.5815999837633,
+            "t=20": 175270.12676783407
+          },
+          "vorticity_mean_norm": {
+            "t=1": 1.8972410388397924,
+            "t=5": 2.6110980027219335,
+            "t=10": 8.841673640204448,
+            "t=20": 3854.809251822068
+          },
+          "enstrophy": {
+            "t=1": 2.4183036113127208,
+            "t=5": 8.996045596174255,
+            "t=10": 181.45721312334794,
+            "t=20": 40660765.82718111
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_7_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.14354401185776716,
+            "t=5": 0.6365290091149373,
+            "t=10": 25.547971992225733,
+            "t=20": 77206.7308343573
+          },
+          "kinetic_energy": {
+            "t=1": 0.005078201095566541,
+            "t=5": 0.03285043793344112,
+            "t=10": 76.37510039949761,
+            "t=20": 933516317.3994199
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.6356611866264015e-07,
+            "t=5": 4.925675366795025e-07,
+            "t=10": 1.76917626578173e-05,
+            "t=20": 0.05118275209049453
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.16241545175251887,
+            "t=5": 0.9734244289637417,
+            "t=10": 42.5857073207383,
+            "t=20": 123163.80933777936
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.11178656781464569,
+            "t=5": 0.7169577610288638,
+            "t=10": 32.12630889964697,
+            "t=20": 91107.18342396177
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 4.08450991272536,
+            "t=5": 61.19219562040103,
+            "t=10": 2517.787459762049,
+            "t=20": 5803534.791345274
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.5471804229574715,
+            "t=5": 1.7879466281022265,
+            "t=10": 89.83212283666553,
+            "t=20": 267741.7645685072
+          },
+          "enstrophy": {
+            "t=1": 0.6264918271876824,
+            "t=5": 18.228370505472583,
+            "t=10": 44934.66372875513,
+            "t=20": 530275191946.00024
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 17,
+      "representation": "vorticity",
+      "best_step": 3000,
+      "best_validation_nrmse": 0.04079989224762028,
+      "checkpoint_sha256": "1346ef67692e3dc55888e2366d1c7330bb50398776c42a5d9148a10277bdd563",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_17_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03799396413846031,
+            "t=5": 0.03577240263944209,
+            "t=10": 0.05560335488835942,
+            "t=20": 1259.1135670401338
+          },
+          "kinetic_energy": {
+            "t=1": 1.73725454799194e-05,
+            "t=5": 1.2535323824906762e-11,
+            "t=10": 0.00011140113348242218,
+            "t=20": 98097.7869218395
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 1.4792662636710628e-08,
+            "t=5": 1.6498662377570114e-11,
+            "t=10": 5.619293400625881e-08,
+            "t=20": 0.001513313403283075
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.042168930473235826,
+            "t=5": 0.04015139478627973,
+            "t=10": 0.19470330601143135,
+            "t=20": 6711.296832789139
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.017976812070636526,
+            "t=5": 0.0182337319801581,
+            "t=10": 0.17281681559631662,
+            "t=20": 6206.613575513496
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.1814213475747465,
+            "t=5": 0.013507531093802573,
+            "t=10": 68.52019245269977,
+            "t=20": 2327640.7676410335
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.14634494595184863,
+            "t=5": 0.1484940703546183,
+            "t=10": 0.1135460837231367,
+            "t=20": 17611.094578071705
+          },
+          "enstrophy": {
+            "t=1": 0.02032961504172029,
+            "t=5": 0.011025304507418503,
+            "t=10": 1.2960825096455069,
+            "t=20": 1538707686.2602026
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_17_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04978710329424719,
+            "t=5": 0.47989133391080185,
+            "t=10": 83.18535903620993,
+            "t=20": 2860172.973218795
+          },
+          "kinetic_energy": {
+            "t=1": 0.0048874918908417275,
+            "t=5": 0.013741897232606826,
+            "t=10": 415.18871367762614,
+            "t=20": 490838986336.82776
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.5024470183481735e-07,
+            "t=5": 6.113847601496024e-07,
+            "t=10": 0.00010612804121219343,
+            "t=20": 3.8236756106263483
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.0939365737217413,
+            "t=5": 1.5064705797118099,
+            "t=10": 296.4631331728965,
+            "t=20": 10223248.15272346
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.027740927259296774,
+            "t=5": 0.8673848532088855,
+            "t=10": 181.01336690351295,
+            "t=20": 6250259.404608323
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.7893674602651428,
+            "t=5": 86.8088316171262,
+            "t=10": 15119.99694201557,
+            "t=20": 523227288.9530099
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.09575237189125628,
+            "t=5": 1.4649069789424627,
+            "t=10": 473.3845961793136,
+            "t=20": 16345094.850869276
+          },
+          "enstrophy": {
+            "t=1": 0.6310353241243047,
+            "t=5": 16.08466669845564,
+            "t=10": 624560.2314327222,
+            "t=20": 742697486666456.0
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_17_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.13835651176747105,
+            "t=5": 1.315419116212946,
+            "t=10": 174.74739381277345,
+            "t=20": 3072220.075895444
+          },
+          "kinetic_energy": {
+            "t=1": 0.004821942255682026,
+            "t=5": 0.10920276461401354,
+            "t=10": 2214.8308963995296,
+            "t=20": 906186589586.8235
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.6083300421283543e-07,
+            "t=5": 1.6824325892029556e-06,
+            "t=10": 0.00019386656955994638,
+            "t=20": 3.624269462809878
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.13538043894085916,
+            "t=5": 3.051354228068315,
+            "t=10": 456.18797175399743,
+            "t=20": 9924631.510520864
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.04489009949051198,
+            "t=5": 1.8411784469408436,
+            "t=10": 292.25023302631047,
+            "t=20": 7687226.880646895
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 3.6579354338013763,
+            "t=5": 257.99022198667524,
+            "t=10": 41408.878501782536,
+            "t=20": 1412934099.7510004
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.1677313511894176,
+            "t=5": 5.90670764592106,
+            "t=10": 1023.210496031071,
+            "t=20": 21075195.323397912
+          },
+          "enstrophy": {
+            "t=1": 0.46103186081885783,
+            "t=5": 139.69349180706672,
+            "t=10": 3484859.589834152,
+            "t=20": 1786954941624111.2
+          }
+        }
+      }
+    },
+    {
+      "model": "FNO",
+      "seed": 27,
+      "representation": "vorticity",
+      "best_step": 2800,
+      "best_validation_nrmse": 0.03542716473145718,
+      "checkpoint_sha256": "374156ac07366f608f50ae88a65e045314df92764a5d88994842b62c5e4f8338",
+      "test": {
+        "wave": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_27_wave_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.03793370885779607,
+            "t=5": 0.03577299616497437,
+            "t=10": 0.046743399230248936,
+            "t=20": 117.70077728053
+          },
+          "kinetic_energy": {
+            "t=1": 1.736001615412519e-05,
+            "t=5": 6.675425035715129e-12,
+            "t=10": 5.439093452628349e-05,
+            "t=20": 887.6372419503023
+          },
+          "true_kinetic_energy": {
+            "t=1": 7.62041651200767e-05,
+            "t=5": 7.677985086234378e-05,
+            "t=10": 7.677985086234378e-05,
+            "t=20": 7.677985086234378e-05
+          },
+          "divergence_rms": {
+            "t=1": 1.7497385681856078e-08,
+            "t=5": 1.1619052510891652e-11,
+            "t=10": 3.777311162933977e-08,
+            "t=20": 0.00012386395900498563
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.06034494456765477,
+            "t=5": 0.07148928108936065,
+            "t=10": 0.21745961542115808,
+            "t=20": 1262.4849618642413
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.04649369492898628,
+            "t=5": 0.061895147681618835,
+            "t=10": 0.20439960447731334,
+            "t=20": 1233.9251688139268
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 0.14697984327992714,
+            "t=5": 0.023861892684400015,
+            "t=10": 100.67332085675936,
+            "t=20": 402929.8629591827
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.3786014608211423,
+            "t=5": 0.5040700625794989,
+            "t=10": 0.33517589143967325,
+            "t=20": 6617.091292762868
+          },
+          "enstrophy": {
+            "t=1": 0.081281099511818,
+            "t=5": 0.1270434006344189,
+            "t=10": 1.537712980650489,
+            "t=20": 55988616.066530466
+          }
+        },
+        "taylor_green": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_27_taylor_green_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.04570834915926262,
+            "t=5": 0.06266540024964391,
+            "t=10": 3.08739417657079,
+            "t=20": 5052.081892973625
+          },
+          "kinetic_energy": {
+            "t=1": 0.004428521732479408,
+            "t=5": 0.00015916352819810703,
+            "t=10": 0.572158692324827,
+            "t=20": 1531447.4373713764
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.0048073141073341685,
+            "t=5": 7.710717498864221e-05,
+            "t=10": 7.677985525219872e-05,
+            "t=20": 7.677985126515775e-05
+          },
+          "divergence_rms": {
+            "t=1": 3.3583497263581146e-07,
+            "t=5": 6.463632001470385e-08,
+            "t=10": 3.1256544515309055e-06,
+            "t=20": 0.00489814935326618
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.09501764192510147,
+            "t=5": 0.4479370414447875,
+            "t=10": 46.837162410800836,
+            "t=20": 121320.47852817691
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.03645650387594581,
+            "t=5": 0.4071551715718189,
+            "t=10": 45.396893266763925,
+            "t=20": 118783.44791351001
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 1.165995155827221,
+            "t=5": 63.29727020429627,
+            "t=10": 7093.283755666853,
+            "t=20": 17257671.669870622
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.12527448855151746,
+            "t=5": 0.6118751983472779,
+            "t=10": 107.06746111812906,
+            "t=20": 309277.3608654497
+          },
+          "enstrophy": {
+            "t=1": 0.5757678155788495,
+            "t=5": 1.3834282018132749,
+            "t=10": 15590.60269697959,
+            "t=20": 104685626417.91664
+          }
+        },
+        "random": {
+          "failures": [],
+          "prediction_file": "vorticity/FNO_27_random_prediction.pt",
+          "nrmse_time": {
+            "t=1": 0.13503405536203525,
+            "t=5": 0.15470754363589004,
+            "t=10": 8.432694647606139,
+            "t=20": 24250.600406188794
+          },
+          "kinetic_energy": {
+            "t=1": 0.0043005393678247975,
+            "t=5": 0.0013765806375365594,
+            "t=10": 4.809048274626617,
+            "t=20": 36728308.17985007
+          },
+          "true_kinetic_energy": {
+            "t=1": 0.003998952271395183,
+            "t=5": 0.00015534726719715667,
+            "t=10": 7.819908190534073e-05,
+            "t=20": 7.678037790753486e-05
+          },
+          "divergence_rms": {
+            "t=1": 2.5044053513034894e-07,
+            "t=5": 1.698755311383058e-07,
+            "t=10": 8.849544515966595e-06,
+            "t=20": 0.025389495409117536
+          },
+          "vorticity_nrmse_time": {
+            "t=1": 0.12506205837081455,
+            "t=5": 0.844759036287289,
+            "t=10": 77.35668078788703,
+            "t=20": 147709.70712598215
+          },
+          "vorticity_consistency_nrmse_time": {
+            "t=1": 0.0476982790631953,
+            "t=5": 0.7830484423334195,
+            "t=10": 74.69168984459355,
+            "t=20": 140187.87774624352
+          },
+          "vorticity_divergence_rms": {
+            "t=1": 4.3245165421826215,
+            "t=5": 205.54148899610345,
+            "t=10": 15883.38148367332,
+            "t=20": 29493631.783871934
+          },
+          "vorticity_mean_norm": {
+            "t=1": 0.15529171759205213,
+            "t=5": 1.3428008766027069,
+            "t=10": 262.01870585774645,
+            "t=20": 497993.3943576937
+          },
+          "enstrophy": {
+            "t=1": 0.4571029116601055,
+            "t=5": 10.835103467268443,
+            "t=10": 89130.29274453149,
+            "t=20": 328623304755.583
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "format_version": 1,
+  "final_time": 20.0,
+  "dt": 0.025,
+  "n_snapshots": 801,
+  "dataset_sha256": {
+    "wave": "b8e526936a633281aa02922be5bafc7e34c61b3c44fd1c7b32de14c8af3bc88f",
+    "taylor_green": "69d7118a151a42045c0ed3eac0e911deff96c2bb8b3d5cea2fe193504f82b14c",
+    "random": "8312d9ee5213bcfeaac46ac9a10c59665fbee56669d721f1b072e836b726de4e"
+  },
+  "checkpoint_sha256": {
+    "velocity/PHFNO_7": "18b68fa3fe245a052863483164581fb8f476f4f51162246f79e536e9673131df",
+    "velocity/PHFNO_17": "ca17025ca402f7eaff3309f5c9d35f083530a9f47dfb8fe37ea6fd5ac9dc2efd",
+    "velocity/PHFNO_27": "7214e943109fc1d0da3e336845ca218df618ba4feff6dabf172687641fa125d9",
+    "velocity/FNO_7": "6d1fbc780b4bb9cb36ed233a893aa676313a06e0810f9c6868b5383dde1fedec",
+    "velocity/FNO_17": "daeb87a7561dd8109da8c7d7fb5371228bd1a5a22331c948b2e32b9c31306643",
+    "velocity/FNO_27": "60a97f9b304ccf5cca942b0aee04033c1a45757eafb70f424e3bd832d7c47743",
+    "vorticity/PHFNO_7": "4228487d02badf4597320a5d5e9594a9cf5d1957acf8d35a7bd2335c9e588433",
+    "vorticity/PHFNO_17": "c1e06076f00499ba6b1fad8c6eafdb41b0f3bc08218281e1e7a3f69b247dcd57",
+    "vorticity/PHFNO_27": "a9700f7321bf969fc18b1ab671cd5d5ce55d96b661fc1ea553bb7c450d95c20f",
+    "vorticity/FNO_7": "7891bc8e96f35554443f78b140f99f3a8a53b502fdf07eaf69b29a35c7d0f791",
+    "vorticity/FNO_17": "1346ef67692e3dc55888e2366d1c7330bb50398776c42a5d9148a10277bdd563",
+    "vorticity/FNO_27": "374156ac07366f608f50ae88a65e045314df92764a5d88994842b62c5e4f8338"
+  },
+  "summary_sha256": {
+    "velocity": "12e703d8a5872efac9f4be4b9e9aa45cae04afe66c1b54d379aa3728d7b9ec52",
+    "vorticity": "530301f3dd0bfa2ce8a5aba1e82916e051f51f6bb8f50298785900f1865bc282"
+  },
+  "test_indices": [
+    28,
+    29,
+    30,
+    31
+  ],
+  "seeds": [
+    7,
+    17,
+    27
+  ],
+  "families": [
+    "wave",
+    "taylor_green",
+    "random"
+  ],
+  "device": "cuda:0",
+  "hardware": "NVIDIA H100 NVL",
+  "torch_version": "2.11.0+cu128",
+  "reference_dtype": "torch.float64",
+  "model_dtype": "torch.float32",
+  "diagnostic_dtype": "torch.float64",
+  "integrators": {
+    "PHFNO": "Gonzalez (checkpoint default)",
+    "FNO": "Euler (checkpoint default)"
+  },
+  "protocol": "Clean held-out t=0; autonomous recurrence with prescribed left-endpoint forcing; no resets",
+  "error_normalization": "Per-trajectory initial componentwise velocity RMS",
+  "failure_policy": "Record nonfinite states or Gonzalez nonconvergence per trajectory; no restart; NaN tail",
+  "aggregation": "Equal weight for trajectories and seeds; no omission of failed trajectories"
+}
