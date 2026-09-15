@@ -6,7 +6,7 @@ from neuralop.models import FNO
 from torch import Tensor, nn
 
 from .fourier import RealFourierCoordinates
-from .integrators import energy_gradient, euler_step
+from .integrators import energy_gradient, euler_step, gonzalez_step
 
 
 def make_fno(cutoff, in_channels, out_channels, hidden_channels, n_layers):
@@ -119,16 +119,19 @@ class PHFNO(nn.Module):
         z = self.coordinates.encode(field)
         return self.coordinates.decode(self.rhs_coordinates(z, control), field.shape[2:])
 
-    def step(self, field: Tensor, control: Tensor | None, dt, method="euler") -> Tensor:
-        if method != "euler":
-            raise ValueError("Only Euler time stepping is implemented")
+    def step(self, field: Tensor, control: Tensor | None, dt, method="gonzalez") -> Tensor:
+        if method not in ("gonzalez", "euler"):
+            raise ValueError("method must be 'gonzalez' or 'euler'")
         z = self.coordinates.encode(field)
         control = self._control(z, control)
-        next_z = euler_step(self.rhs_coordinates, z, control, dt)
+        if method == "gonzalez":
+            next_z = gonzalez_step(self.energy, self.structure(z), z, control, dt)
+        else:
+            next_z = euler_step(self.rhs_coordinates, z, control, dt)
         return self.coordinates.decode(next_z, field.shape[2:])
 
     def rollout(self, initial: Tensor, controls: Tensor | None, times: Tensor,
-                method="euler") -> Tensor:
+                method="gonzalez") -> Tensor:
         return _rollout(
             self, self.coordinates.project(initial), controls, times, method
         )

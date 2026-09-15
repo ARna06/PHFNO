@@ -9,6 +9,7 @@ import torch
 from tqdm.auto import tqdm
 
 from phfno import FNOBaseline, PHFNO
+from .losses import h1_loss
 from .metrics import evaluate_model
 
 
@@ -103,6 +104,8 @@ def synchronize(device):
 
 def predict_next(model, transitions, indices):
     field = transitions["field"][indices]
+    if isinstance(model, PHFNO):
+        return model.step(field, transitions["control"][indices], transitions["dt"][indices])
     dt = transitions["dt"][indices].reshape(-1, 1, 1, 1, 1)
     return model.coordinates.project(field) + dt * model(field, transitions["control"][indices])
 
@@ -133,7 +136,7 @@ def train_model(model, training, validation, config, seed, scale, threshold):
     initial_error = validation_error(model, validation, scale, config.batch_size)
     if not torch.isfinite(torch.tensor(initial_error)):
         raise FloatingPointError("Initial validation error is nonfinite")
-    history = [{"step": 0, "train_nrmse": None, "validation_nrmse": initial_error,
+    history = [{"step": 0, "train_nrmse": None, "train_h1_loss": None, "validation_nrmse": initial_error,
                 "optimization_seconds": 0.0}]
     best_error, best_step = initial_error, 0
     best_state = copy_state(model)
@@ -141,6 +144,7 @@ def train_model(model, training, validation, config, seed, scale, threshold):
     threshold_seconds = 0.0 if initial_error <= threshold else None
     elapsed = 0.0
     loss_sum = torch.zeros((), device=config.device)
+    squared_error_sum = torch.zeros((), device=config.device)
     segment_steps = 0
     model.train()
     synchronize(config.device)
@@ -151,11 +155,13 @@ def train_model(model, training, validation, config, seed, scale, threshold):
         indices = batches[step - 1]
         optimizer.zero_grad(set_to_none=True)
         prediction = predict_next(model, training, indices)
-        loss = (prediction - training["noisy_target"][indices]).square().mean() / scale**2
+        target = training["noisy_target"][indices]
+        loss = h1_loss(prediction, target) / scale**2
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip, error_if_nonfinite=True)
         optimizer.step()
         loss_sum += loss.detach()
+        squared_error_sum += (prediction.detach() - target).square().mean() / scale**2
         segment_steps += 1
         if step % config.eval_every == 0 or step == config.steps:
             synchronize(config.device)
@@ -163,7 +169,8 @@ def train_model(model, training, validation, config, seed, scale, threshold):
             error = validation_error(model, validation, scale, config.batch_size)
             if not torch.isfinite(torch.tensor(error)):
                 raise FloatingPointError(f"Validation error is nonfinite at step {step}")
-            history.append({"step": step, "train_nrmse": (loss_sum.item() / segment_steps)**0.5,
+            history.append({"step": step, "train_nrmse": (squared_error_sum.item() / segment_steps)**0.5,
+                            "train_h1_loss": loss_sum.item() / segment_steps,
                             "validation_nrmse": error, "optimization_seconds": elapsed})
             progress.set_postfix(validation=f"{error:.4f}", refresh=False)
             if error < best_error:
@@ -172,6 +179,7 @@ def train_model(model, training, validation, config, seed, scale, threshold):
             if threshold_step is None and error <= threshold:
                 threshold_step, threshold_seconds = step, elapsed
             loss_sum.zero_()
+            squared_error_sum.zero_()
             segment_steps = 0
             model.train()
             synchronize(config.device)
