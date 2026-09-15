@@ -7,13 +7,15 @@ The data describe a three-component incompressible velocity on a periodic unit c
 The spatial domain and governing equation are
 
 $$
-\Omega=(\mathbb R/\mathbb Z)^3,\qquad t\in[0,1],
+\Omega=(\mathbb{R}/\mathbb{Z})^3,\qquad t\in[0,1],
 $$
 
 $$
-\partial_t\mathbf v+(\mathbf v\cdot\nabla)\mathbf v
-=-\nabla p+\nu\Delta\mathbf v+\mathbf f,
-\qquad \nabla\cdot\mathbf v=0.
+\begin{aligned}
+\partial_t\mathbf{v}+(\mathbf{v}\cdot\nabla)\mathbf{v}
+&=-\nabla p+\nu\Delta\mathbf{v}+\mathbf{f},\\
+\nabla\cdot\mathbf{v}&=0.
+\end{aligned}
 $$
 
 Space is sampled uniformly without duplicating the periodic endpoint. Saved times include both zero and one. The numerical solver takes smaller internal steps when required by advection, diffusion, or forcing.
@@ -36,8 +38,8 @@ The starter settings are:
 The componentwise RMS convention averages over both spatial points and velocity components:
 
 $$
-\operatorname{RMS}(\mathbf v)
-=\left(\frac{1}{3K}\sum_{j=1}^{K}\|\mathbf v(x_j)\|^2\right)^{1/2}.
+\text{RMS}(\mathbf{v})
+=\left(\frac{1}{3K}\sum_{j=1}^{K}\|\mathbf{v}(x_j)\|^2\right)^{1/2}.
 $$
 
 Simulation uses double precision by default. Saved velocity, force, and viscous fields use single precision for use with the neural models. These small datasets are intended for initial experiments, rather than claims about resolved turbulence.
@@ -47,8 +49,12 @@ Simulation uses double precision by default. Saved velocity, force, and viscous 
 Every trajectory uses the same fixed spatial forcing pattern:
 
 $$
-\mathbf g(x,y,z)=\sqrt{\frac65}
-\begin{pmatrix}1\\0\\-2\end{pmatrix}
+\mathbf{g}(x,y,z)=\sqrt{\frac{6}{5}}
+\begin{pmatrix}
+1\\
+0\\
+-2
+\end{pmatrix}
 \sin\!\left(2\pi(2x+3y+z)\right).
 $$
 
@@ -58,8 +64,10 @@ A scalar control sets the force strength. At each saved time, evaluate a cosine 
 
 $$
 u_j=A_f\cos(2\pi\omega t_j),
-\qquad
-\mathbf f(t,x)=u_j\mathbf g(x),
+$$
+
+$$
+\mathbf{f}(t,x)=u_j\mathbf{g}(x),
 \qquad t_j\le t<t_{j+1}.
 $$
 
@@ -78,14 +86,14 @@ A zero forcing amplitude gives an unforced case. Numerical trajectories with non
 The only physical dissipation is the Navier–Stokes viscous term:
 
 $$
-\mathbf d_{\mathrm{visc}}=\nu\Delta\mathbf v.
+\mathbf{d}_{\text{visc}}=\nu\Delta\mathbf{v}.
 $$
 
 In Fourier space, it acts separately on each mode:
 
 $$
-\widehat{\mathbf d}_{\mathrm{visc}}(k)
-=-4\pi^2\nu\|k\|^2\widehat{\mathbf v}(k).
+\widehat{\mathbf{d}}_{\text{visc}}(k)
+=-4\pi^2\nu\|k\|^2\widehat{\mathbf{v}}(k).
 $$
 
 Higher frequencies decay faster. There is no added linear drag or separate uniform damping term. The viscous acceleration is stored at every saved clean velocity field, along with the viscosity used to generate the trajectory.
@@ -93,20 +101,25 @@ Higher frequencies decay faster. There is no added linear drag or separate unifo
 For periodic incompressible flow, kinetic energy, dissipation rate, and supplied power are
 
 $$
-E(t)=\frac12\int_\Omega\|\mathbf v\|^2\,dx,
+E(t)=\frac{1}{2}\int_\Omega\|\mathbf{v}\|^2\,\text{d}x.
 $$
 
 $$
-\mathcal D(t)=\nu\int_\Omega\|\nabla\mathbf v\|_F^2\,dx
-=-\int_\Omega\mathbf v\cdot\mathbf d_{\mathrm{visc}}\,dx,
-\qquad
-\mathcal P(t)=\int_\Omega\mathbf v\cdot\mathbf f\,dx.
+\begin{aligned}
+\mathcal{D}(t)
+&=\nu\int_\Omega\|\nabla\mathbf{v}\|_{\text{F}}^2\,\text{d}x\\
+&=-\int_\Omega\mathbf{v}\cdot\mathbf{d}_{\text{visc}}\,\text{d}x.
+\end{aligned}
+$$
+
+$$
+\mathcal{P}(t)=\int_\Omega\mathbf{v}\cdot\mathbf{f}\,\text{d}x.
 $$
 
 They obey the continuous balance
 
 $$
-\frac{dE}{dt}=\mathcal P(t)-\mathcal D(t).
+\frac{\text{d}E}{\text{d}t}=\mathcal{P}(t)-\mathcal{D}(t).
 $$
 
 Dissipation is nonnegative, but energy need not decrease when external input supplies power. Input power and the energy rate are recorded at the left endpoint of each saved interval. They are instantaneous quantities, not a claim that a finite difference between saved energies is exactly equal to those rates.
@@ -118,18 +131,25 @@ Dissipation is nonnegative, but energy need not decrease when external input sup
 Choose a random phase for each trajectory:
 
 $$
-\mathbf v_0(x,y,z)=\frac{A}{\sqrt5}
-\begin{pmatrix}1\\0\\-2\end{pmatrix}
+\mathbf{v}_0(x,y,z)=\frac{A}{\sqrt{5}}
+\begin{pmatrix}
+1\\
+0\\
+-2
+\end{pmatrix}
 \sin\!\left(2\pi(2x+3y+z)+\phi\right).
 $$
 
 Normalize the initial field to the chosen RMS velocity. The forcing has the same wavevector and polarization, so nonlinear advection remains zero even as the phase and amplitude evolve. Over each interval, the exact solution is
 
 $$
-\mathbf v_{j+1}
-=e^{-\lambda\Delta t_j}\mathbf v_j
-+\frac{1-e^{-\lambda\Delta t_j}}{\lambda}\,u_j\mathbf g,
-\qquad \lambda=56\pi^2\nu.
+\mathbf{v}_{j+1}
+=e^{-\lambda\Delta t_j}\mathbf{v}_j
++\frac{1-e^{-\lambda\Delta t_j}}{\lambda}\,u_j\mathbf{g},
+$$
+
+$$
+\lambda=56\pi^2\nu.
 $$
 
 At zero viscosity, the fraction is replaced by the interval length. Without forcing, this reduces to exponential viscous decay. These trajectories provide an exact reference for checking the numerical solver and basic learning behavior. They do not exercise nonlinear interactions between distinct wavevectors.
@@ -139,7 +159,7 @@ At zero viscosity, the fraction is replaced by the interval length. Without forc
 Use periodic spatial shifts of the initial field
 
 $$
-\mathbf v_0=A
+\mathbf{v}_0=A
 \begin{pmatrix}
 \sin(2\pi x)\cos(2\pi y)\cos(2\pi z)\\
 -\cos(2\pi x)\sin(2\pi y)\cos(2\pi z)\\
@@ -154,8 +174,8 @@ Each shifted field is divergence-free and is normalized to the chosen initial RM
 Generate random real fields, transform them to Fourier coefficients, retain only low frequencies, and project each nonzero mode perpendicular to its wavevector:
 
 $$
-\widehat{\mathbf v}_0(k)
-=\left(I-\frac{kk^T}{\|k\|^2}\right)\widehat{\mathbf w}(k),
+\widehat{\mathbf{v}}_0(k)
+=\left(I-\frac{kk^T}{\|k\|^2}\right)\widehat{\mathbf{w}}(k),
 \qquad k\ne0.
 $$
 
@@ -180,12 +200,14 @@ The force stays constant throughout every internal step belonging to the same sa
 Noise is added only after the clean trajectory has been generated:
 
 $$
-\widetilde{\mathbf v}_j
-=\mathbf v_j+\sigma\boldsymbol\epsilon_j,
+\widetilde{\mathbf{v}}_j
+=\mathbf{v}_j+\sigma\boldsymbol{\epsilon}_j.
+$$
+
+$$
+\boldsymbol{\epsilon}_j\sim\mathcal{N}(0,I),
 \qquad
-\boldsymbol\epsilon_j\sim\mathcal N(0,I),
-\qquad
-\sigma=\eta\operatorname{RMS}(\mathbf v_0).
+\sigma=\eta\,\text{RMS}(\mathbf{v}_0).
 $$
 
 The default relative noise level is 0.01, giving a standard deviation of 0.002. This scale stays fixed throughout the trajectory. Clean and noisy observations are retained together; noise does not alter the external force, viscosity, or underlying clean solution.
