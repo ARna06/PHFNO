@@ -8,6 +8,7 @@ from nsdata.initial_conditions import (
     plane_wave,
     random_velocity,
     taylor_green,
+    wave_forcing,
 )
 
 
@@ -102,6 +103,46 @@ def test_exact_wave_trajectory_matches_viscous_decay():
     torch.testing.assert_close(energy / energy[:, :1], expected.expand_as(energy))
     stationary = exact_wave_trajectory(velocity, times, viscosity=0)
     torch.testing.assert_close(stationary, velocity[:, None].expand_as(stationary))
+
+
+def test_wave_forcing_is_divergence_free_and_has_unit_rms():
+    forcing = wave_forcing(10)
+    assert forcing.shape == (1, 3, 10, 10, 10)
+    torch.testing.assert_close(forcing.square().mean(), torch.tensor(1.0, dtype=forcing.dtype))
+    assert spectral_divergence(forcing).abs().max() < 1e-12
+    torch.testing.assert_close(forcing[:, 2], -2 * forcing[:, 0])
+
+
+def test_exact_wave_trajectory_with_different_interval_forcing():
+    initial = plane_wave(10, batch_size=2)
+    basis = wave_forcing(10).expand_as(initial)
+    forcing = torch.stack((2 * basis, -basis), dim=1)
+    trajectory = exact_wave_trajectory(initial, [0, 0.25, 0.75], 1 / (56 * math.pi**2), forcing)
+    first = math.exp(-0.25) * initial + 2 * (1 - math.exp(-0.25)) * basis
+    last = math.exp(-0.75) * initial + (
+        2 * math.exp(-0.5) * (1 - math.exp(-0.25)) - (1 - math.exp(-0.5))
+    ) * basis
+    torch.testing.assert_close(trajectory[:, 0], initial)
+    torch.testing.assert_close(trajectory[:, 1], first)
+    torch.testing.assert_close(trajectory[:, 2], last)
+
+
+@pytest.mark.parametrize("viscosity", [0, 1e-20])
+def test_exact_wave_forcing_with_zero_or_tiny_viscosity(viscosity):
+    initial = plane_wave(10)
+    basis = wave_forcing(10)
+    forcing = torch.stack((2 * basis, -basis), dim=1)
+    trajectory = exact_wave_trajectory(initial, [0, 0.25, 1], viscosity, forcing)
+    torch.testing.assert_close(trajectory[:, 1], initial + 0.5 * basis)
+    torch.testing.assert_close(trajectory[:, 2], initial - 0.25 * basis)
+
+
+def test_invalid_exact_wave_forcing():
+    initial = plane_wave(10)
+    with pytest.raises(ValueError, match="forcing must have shape"):
+        exact_wave_trajectory(initial, [0, 1], 0.1, torch.zeros_like(initial))
+    with pytest.raises(ValueError, match="finite values"):
+        exact_wave_trajectory(initial, [0, 1], 0.1, torch.full_like(initial[:, None], float("nan")))
 
 
 @pytest.mark.parametrize("initializer", [plane_wave, taylor_green, random_velocity])

@@ -64,8 +64,18 @@ class PeriodicNavierStokes:
         divergence = 1j * (self.k * spectrum).sum(dim=1)
         return torch.fft.ifftn(divergence, dim=(-3, -2, -1), norm="forward").real
 
-    def rhs(self, spectrum: torch.Tensor):
+    def viscous_term(self, field: torch.Tensor):
+        self._validate_field(field)
+        spectrum = torch.fft.fftn(field, dim=(-3, -2, -1), norm="forward")
+        viscous_spectrum = -self.viscosity * self.k2 * spectrum
+        return torch.fft.ifftn(viscous_spectrum, dim=(-3, -2, -1), norm="forward").real
+
+    def rhs(self, spectrum: torch.Tensor, forcing_spectrum: torch.Tensor | None = None):
         self._validate_field(spectrum, spectral=True)
+        if forcing_spectrum is not None:
+            self._validate_field(forcing_spectrum, spectral=True)
+            if forcing_spectrum.shape != spectrum.shape:
+                raise ValueError("forcing_spectrum must have the same shape as spectrum")
         spectrum = self._project_spectrum(spectrum)
         velocity = torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real
         curl_spectrum = torch.linalg.cross(self.ik, spectrum, dim=1)
@@ -74,17 +84,22 @@ class PeriodicNavierStokes:
         nonlinear = torch.fft.fftn(nonlinear, dim=(-3, -2, -1), norm="forward")
         derivative = self._project_spectrum(nonlinear) - self.viscosity * self.k2 * spectrum
         derivative[:, :, 0, 0, 0] = 0
+        if forcing_spectrum is not None:
+            derivative = derivative + self._project_spectrum(forcing_spectrum)
         return derivative
 
-    def _step(self, spectrum: torch.Tensor, dt: float):
-        k1 = self.rhs(spectrum)
-        k2 = self.rhs(spectrum + 0.5 * dt * k1)
-        k3 = self.rhs(spectrum + 0.5 * dt * k2)
-        k4 = self.rhs(spectrum + dt * k3)
+    def _step(self, spectrum: torch.Tensor, dt: float, forcing_spectrum=None):
+        k1 = self.rhs(spectrum, forcing_spectrum)
+        k2 = self.rhs(spectrum + 0.5 * dt * k1, forcing_spectrum)
+        k3 = self.rhs(spectrum + 0.5 * dt * k2, forcing_spectrum)
+        k4 = self.rhs(spectrum + dt * k3, forcing_spectrum)
         return self._project_spectrum(spectrum + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
 
     @torch.no_grad()
-    def solve(self, initial: torch.Tensor, times, max_dt: float = 0.005, cfl: float = 0.4):
+    def solve(
+        self, initial: torch.Tensor, times, max_dt: float = 0.005,
+        cfl: float = 0.4, forcing: torch.Tensor | None = None,
+    ):
         self._validate_field(initial)
         if not torch.isfinite(initial).all():
             raise ValueError("initial field must be finite")
@@ -97,19 +112,41 @@ class PeriodicNavierStokes:
             raise ValueError("times must be a nonempty finite one-dimensional sequence")
         if times[0] != 0 or not torch.all(times[1:] > times[:-1]):
             raise ValueError("times must start at zero and be strictly increasing")
+        if forcing is not None:
+            expected_shape = (initial.shape[0], times.numel() - 1, *initial.shape[1:])
+            if not isinstance(forcing, torch.Tensor) or forcing.shape != expected_shape:
+                raise ValueError("forcing must have shape [batch, time - 1, 3, grid_size, grid_size, grid_size]")
+            if forcing.dtype != self.dtype:
+                raise TypeError(f"forcing dtype must be {self.dtype}")
+            if forcing.device != self.device:
+                raise ValueError(f"forcing device must be {self.device}")
+            if not torch.isfinite(forcing).all():
+                raise ValueError("forcing must be finite")
         spectrum = torch.fft.fftn(initial, dim=(-3, -2, -1), norm="forward")
         spectrum = self._project_spectrum(spectrum)
         velocity = torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real
         snapshots = [velocity]
         current_time = 0.0
-        for target_time in times[1:].tolist():
+        for interval, target_time in enumerate(times[1:].tolist()):
+            forcing_spectrum = None
+            forcing_dt = math.inf
+            if forcing is not None:
+                forcing_spectrum = torch.fft.fftn(
+                    forcing[:, interval], dim=(-3, -2, -1), norm="forward"
+                )
+                forcing_spectrum = self._project_spectrum(forcing_spectrum)
+                acceleration = torch.fft.ifftn(
+                    forcing_spectrum, dim=(-3, -2, -1), norm="forward"
+                ).real.abs().sum(dim=1).amax().item()
+                if acceleration:
+                    forcing_dt = math.sqrt(cfl / (self.grid_size * acceleration))
             while current_time < target_time:
                 speed = velocity.abs().sum(dim=1).amax().item()
                 advection_dt = cfl / (self.grid_size * speed) if speed else math.inf
-                dt = min(max_dt, advection_dt, self.diffusion_dt, target_time - current_time)
+                dt = min(max_dt, advection_dt, self.diffusion_dt, forcing_dt, target_time - current_time)
                 if current_time + dt <= current_time:
                     raise RuntimeError("time step is too small to advance the solution")
-                spectrum = self._step(spectrum, dt)
+                spectrum = self._step(spectrum, dt, forcing_spectrum)
                 if not torch.isfinite(spectrum).all():
                     raise RuntimeError("solution became nonfinite; reduce max_dt or initial amplitude")
                 velocity = torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real

@@ -98,8 +98,11 @@ def test_taylor_green_initial_acceleration():
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
 def test_cuda_matches_cpu():
     initial = plane_wave()
-    cpu = PeriodicNavierStokes(8, viscosity=0.03).solve(initial, [0, 0.01])
-    cuda = PeriodicNavierStokes(8, viscosity=0.03, device="cuda").solve(initial.cuda(), [0, 0.01])
+    forcing = 0.3 * initial[:, None]
+    cpu = PeriodicNavierStokes(8, viscosity=0.03).solve(initial, [0, 0.01], forcing=forcing)
+    cuda = PeriodicNavierStokes(8, viscosity=0.03, device="cuda").solve(
+        initial.cuda(), [0, 0.01], forcing=forcing.cuda()
+    )
     torch.testing.assert_close(cuda.cpu(), cpu, atol=1e-12, rtol=1e-12)
 
 
@@ -140,3 +143,82 @@ def test_invalid_parameters_and_fields():
         solver.solve(plane_wave(), [0, 1], max_dt=0)
     with pytest.raises(ValueError, match="cfl"):
         solver.solve(plane_wave(), [0, 1], cfl=1.1)
+
+
+def test_piecewise_uniform_forcing_drives_mean_velocity():
+    solver = PeriodicNavierStokes(8, viscosity=0.03)
+    initial = torch.zeros(2, 3, 8, 8, 8, dtype=torch.float64)
+    controls = torch.tensor(
+        [[[0.3, -0.2, 0.1], [-0.4, 0.2, 0.3]], [[0.1, 0.2, 0.3], [0.4, 0.1, -0.2]]],
+        dtype=torch.float64,
+    )
+    forcing = controls[..., None, None, None].expand(2, 2, 3, 8, 8, 8).contiguous()
+    times = torch.tensor([0.0, 0.02, 0.05], dtype=torch.float64)
+    trajectory = solver.solve(initial, times, forcing=forcing)
+    expected_mean = torch.zeros(2, 3, 3, dtype=torch.float64)
+    expected_mean[:, 1:] = (controls * times.diff()[None, :, None]).cumsum(dim=1)
+    torch.testing.assert_close(
+        trajectory, expected_mean[..., None, None, None].expand_as(trajectory), atol=1e-14, rtol=1e-13
+    )
+
+
+@pytest.mark.parametrize("viscosity", [0.0, 0.03])
+def test_piecewise_forced_plane_wave_matches_exact_solution(viscosity):
+    solver = PeriodicNavierStokes(8, viscosity=viscosity)
+    initial = plane_wave()
+    controls = [0.4, -0.25]
+    times = [0.0, 0.04, 0.1]
+    forcing = torch.stack([control * initial for control in controls], dim=1)
+    trajectory = solver.solve(initial, times, max_dt=0.003, forcing=forcing)
+    amplitudes = [1.0]
+    rate = 8 * math.pi**2 * viscosity
+    for start, end, control in zip(times, times[1:], controls):
+        dt = end - start
+        response = -math.expm1(-rate * dt) / rate if rate else dt
+        amplitudes.append(amplitudes[-1] * math.exp(-rate * dt) + control * response)
+    expected = initial[:, None] * torch.tensor(amplitudes, dtype=torch.float64)[None, :, None, None, None, None]
+    torch.testing.assert_close(trajectory, expected, rtol=1e-10, atol=1e-12)
+
+
+def test_forced_rhs_obeys_energy_balance_and_viscous_term():
+    solver = PeriodicNavierStokes(8, viscosity=0.02)
+    generator = torch.Generator().manual_seed(31)
+    field = solver.project(torch.randn(1, 3, 8, 8, 8, generator=generator, dtype=torch.float64))
+    forcing = torch.randn(1, 3, 8, 8, 8, generator=generator, dtype=torch.float64)
+    spectrum = torch.fft.fftn(field, dim=(-3, -2, -1), norm="forward")
+    forcing_spectrum = torch.fft.fftn(forcing, dim=(-3, -2, -1), norm="forward")
+    derivative = solver.rhs(spectrum, forcing_spectrum)
+    energy_derivative = (spectrum.conj() * derivative).real.sum()
+    viscous_power = (field * solver.viscous_term(field)).sum(dim=1).mean()
+    forcing_power = (field * forcing).sum(dim=1).mean()
+    expected_dissipation = solver.viscosity * (solver.k2 * spectrum.abs().square()).sum()
+    torch.testing.assert_close(viscous_power, -expected_dissipation, atol=1e-12, rtol=1e-12)
+    torch.testing.assert_close(energy_derivative, viscous_power + forcing_power, atol=1e-12, rtol=1e-12)
+
+
+def test_viscous_term_plane_wave():
+    solver = PeriodicNavierStokes(8, viscosity=0.03)
+    field = plane_wave()
+    torch.testing.assert_close(solver.viscous_term(field), -8 * math.pi**2 * 0.03 * field)
+
+
+def test_zero_forcing_matches_unforced_solution():
+    solver = PeriodicNavierStokes(8, viscosity=0.03)
+    initial = plane_wave()
+    unforced = solver.solve(initial, [0, 0.01])
+    forced = solver.solve(initial, [0, 0.01], forcing=torch.zeros_like(initial[:, None]))
+    torch.testing.assert_close(forced, unforced, atol=0, rtol=0)
+
+
+def test_invalid_forcing():
+    solver = PeriodicNavierStokes(8, viscosity=0.03)
+    initial = plane_wave()
+    with pytest.raises(ValueError, match="forcing must have shape"):
+        solver.solve(initial, [0, 0.1], forcing=initial)
+    with pytest.raises(TypeError, match="forcing dtype"):
+        solver.solve(initial, [0, 0.1], forcing=initial[:, None].float())
+    with pytest.raises(ValueError, match="forcing must be finite"):
+        solver.solve(initial, [0, 0.1], forcing=initial[:, None] * math.nan)
+    spectrum = torch.fft.fftn(initial, dim=(-3, -2, -1), norm="forward")
+    with pytest.raises(ValueError, match="same shape"):
+        solver.rhs(spectrum, spectrum.expand(2, 3, 8, 8, 8))

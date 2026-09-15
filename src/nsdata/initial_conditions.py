@@ -95,7 +95,15 @@ def random_velocity(
     return field * (rms / current_rms)
 
 
-def exact_wave_trajectory(initial, times, viscosity):
+def wave_forcing(grid_size, device="cpu", dtype=torch.float64):
+    _validate_grid(grid_size, 1, dtype, minimum=7)
+    x, y, z = _coordinates(grid_size, device, dtype)
+    wave = torch.sin(2 * math.pi * (2 * x + 3 * y + z))
+    direction = torch.tensor([1, 0, -2], device=device, dtype=dtype) * math.sqrt(6 / 5)
+    return direction[None, :, None, None, None] * wave[None, None]
+
+
+def exact_wave_trajectory(initial, times, viscosity, forcing=None):
     _validate_scale(viscosity, "viscosity")
     if initial.ndim != 5 or initial.shape[1] != 3:
         raise ValueError("initial must have shape [batch, 3, x, y, z]")
@@ -106,5 +114,19 @@ def exact_wave_trajectory(initial, times, viscosity):
         raise ValueError("times must be a nonempty finite one-dimensional sequence")
     if (times[1:] <= times[:-1]).any():
         raise ValueError("times must be strictly increasing")
-    decay = torch.exp(-56 * math.pi**2 * viscosity * (times - times[0]))
-    return initial[:, None] * decay[None, :, None, None, None, None]
+    rate = 56 * math.pi**2 * viscosity
+    if forcing is None:
+        decay = torch.exp(-rate * (times - times[0]))
+        return initial[:, None] * decay[None, :, None, None, None, None]
+    forcing = torch.as_tensor(forcing, dtype=initial.dtype, device=initial.device)
+    expected_shape = (initial.shape[0], times.numel() - 1, *initial.shape[1:])
+    if forcing.shape != expected_shape:
+        raise ValueError("forcing must have shape [batch, time_intervals, 3, x, y, z]")
+    if not torch.isfinite(forcing).all():
+        raise ValueError("forcing must contain finite values")
+    states = [initial]
+    for index, dt in enumerate(times[1:] - times[:-1]):
+        decay = torch.exp(-rate * dt)
+        weight = -torch.expm1(-rate * dt) / rate if rate > 0 else dt
+        states.append(decay * states[-1] + weight * forcing[:, index])
+    return torch.stack(states, dim=1)
