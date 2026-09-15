@@ -5,6 +5,5 @@ __pycache__/
 .ipynb_checkpoints/
 build/
 dist/
-/implementation.md
 /synthetic_data.md
 /datasets/**/*.pt
