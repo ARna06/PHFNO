@@ -79,6 +79,21 @@ def test_learning_curves_use_shared_time_ranges_and_seed_means(results):
         plt.close(figure)
 
 
+def test_rollout_band_averages_trajectories_before_comparing_seeds(results):
+    runs = [run for run in results["runs"] if run["model"] == "PHFNO"]
+    runs[0]["test"]["wave"]["nrmse_time"] = torch.tensor([[0.0, 0.0, 0.0], [4.0, 4.0, 4.0]])
+    runs[1]["test"]["wave"]["nrmse_time"] = torch.ones(2, 3)
+    figure = rollout_curves(results)
+    try:
+        ax = figure.axes[0]
+        np.testing.assert_allclose(ax.lines[0].get_ydata(), [1.5, 1.5, 1.5])
+        band_values = ax.collections[0].get_paths()[0].vertices[:, 1]
+        assert band_values.min() == pytest.approx(1.0)
+        assert band_values.max() == pytest.approx(2.0)
+    finally:
+        plt.close(figure)
+
+
 def test_physics_plot_does_not_change_zero_divergence(results):
     figure = physics_curves(results)
     try:

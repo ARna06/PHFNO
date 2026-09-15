@@ -6,6 +6,7 @@ from pathlib import Path
 from time import perf_counter
 
 import torch
+from tqdm.auto import tqdm
 
 from phfno import FNOBaseline, PHFNO
 from .metrics import evaluate_model
@@ -27,6 +28,7 @@ class ComparisonConfig:
     eval_every: int = 25
     gradient_clip: float = 1.0
     device: str = "cuda"
+    progress: bool = True
 
     def __post_init__(self):
         splits = [set(self.train_indices), set(self.validation_indices), set(self.test_indices)]
@@ -143,7 +145,9 @@ def train_model(model, training, validation, config, seed, scale, threshold):
     model.train()
     synchronize(config.device)
     started = perf_counter()
-    for step in range(1, config.steps + 1):
+    progress = tqdm(range(1, config.steps + 1), desc=f"{type(model).__name__} seed {seed}",
+                    unit="step", disable=not config.progress, mininterval=1.0)
+    for step in progress:
         indices = batches[step - 1]
         optimizer.zero_grad(set_to_none=True)
         prediction = predict_next(model, training, indices)
@@ -161,6 +165,7 @@ def train_model(model, training, validation, config, seed, scale, threshold):
                 raise FloatingPointError(f"Validation error is nonfinite at step {step}")
             history.append({"step": step, "train_nrmse": (loss_sum.item() / segment_steps)**0.5,
                             "validation_nrmse": error, "optimization_seconds": elapsed})
+            progress.set_postfix(validation=f"{error:.4f}", refresh=False)
             if error < best_error:
                 best_error, best_step = error, step
                 best_state = copy_state(model)

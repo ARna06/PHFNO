@@ -34,7 +34,7 @@ class ScalarModel(nn.Module):
 def small_config(**kwargs):
     options = dict(
         seeds=(7,), cutoff=(1, 1, 1), hidden_channels=2, n_layers=1,
-        mlp_width=4, steps=3, batch_size=2, eval_every=2, device="cpu",
+        mlp_width=4, steps=3, batch_size=2, eval_every=2, device="cpu", progress=False,
     )
     return ComparisonConfig(**{**options, **kwargs})
 
@@ -132,6 +132,21 @@ def test_parameter_count_counts_trainable_real_scalar_values():
         nn.Parameter(torch.zeros(4), requires_grad=False),
     ])
     assert parameter_count(model) == 7
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_training_progress_reports_the_model_seed_and_validation(enabled, capsys):
+    training = prepare_transitions({"sample": sample_data()}, [0, 1], "cpu")
+    validation = prepare_transitions({"sample": sample_data()}, [2], "cpu")
+    config = small_config(progress=enabled)
+    train_model(ScalarModel(), training, validation, config, 7, 1.0, 0.1)
+    output = capsys.readouterr().err
+    if enabled:
+        assert "ScalarModel seed 7" in output
+        assert "3/3" in output
+        assert "validation=" in output
+    else:
+        assert output == ""
 
 
 @pytest.mark.parametrize("name", ["PHFNO", "FNO"])

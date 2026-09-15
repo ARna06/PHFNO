@@ -18,7 +18,8 @@ def _figure(rows, columns, width=15, height=4):
 
 
 def _band(ax, x, values, label, color, floor=None):
-    values = np.asarray(values).reshape(-1, len(x))
+    values = np.asarray(values)
+    values = values.reshape(len(values), -1, len(x)).mean(axis=1)
     mean = values.mean(axis=0)
     low, high = values.min(axis=0), values.max(axis=0)
     if floor is not None:
