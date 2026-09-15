@@ -89,12 +89,32 @@ The diagnostics also compare the learned change caused by switching the control 
 
 The port-Hamiltonian model has a skew operator of rank at most two and scalar damping. Its learned energy is not constrained to equal physical kinetic energy. Satisfying its own energy identity therefore does not establish that it has recovered Navier–Stokes energy transfer or viscous dissipation.
 
-The baseline receives a broadcast scalar control and has no positional embedding. Its translation symmetry restricts its ability to produce a fixed spatial forcing pattern from that control. This experiment retains that interface, so any difference can reflect this limitation as well as optimization and the port-Hamiltonian structure. It should not be described as a general advantage over all FNO formulations.
+Both models learn their control response through an FNO without positional information. The baseline broadcasts the scalar control; the port-Hamiltonian model constructs its input map from the velocity field using its FNO. Shifting the velocity field shifts the learned control response in both models, whereas the prescribed forcing pattern stays fixed in space. Neither input interface can therefore produce this fixed force independently of the state for arbitrary translated states. The port-Hamiltonian energy network can break the translation symmetry of its autonomous dynamics, but it does not remove this restriction on the input map. This comparison reflects these input interfaces as well as optimization and the port-Hamiltonian structure; it cannot establish a general advantage over other FNO formulations.
 
 Euler training learns changes across finite snapshot intervals. These differ from instantaneous derivatives, even with perfect clean data. For the wave here, the unforced secant derivative over one interval is approximately 6.6% smaller in magnitude than its instantaneous derivative. Reference Euler error and secant-derivative error are retained to expose this effect. Finite-step energy differences likewise need not satisfy the instantaneous energy balance exactly.
 
 ## Run and inspect
 
-Running [the comparison notebook](ipynb/compare_phfno_fno.ipynb) retrains the models by default, with tqdm showing training progress. Figures appear directly in the notebook. The configuration, training histories, selected checkpoints, test diagnostics, and summary are saved under `results/phfno_fno_large/`, including the tensor results and JSON summary.
+Running [the comparison notebook](ipynb/compare_phfno_fno.ipynb) retrains the models by default. With the notebook dependencies installed, tqdm uses a widget that updates in place for each training run. Figures appear directly in the notebook, without footer captions. The velocity slice uses the first seed and the first held-out trajectory, chosen before looking at the results.
+
+The configuration, training histories, selected checkpoints, test diagnostics, and summary are saved under `results/phfno_fno_large/`, including the tensor results and JSON summary.
 
 The notebook contains only code; this document explains what its outputs measure. Conclusions should follow the completed curves and held-out errors, including cases where the FNO learns faster or neither model reproduces the reference well.
+
+## What the larger run showed
+
+The H100 run used the full 3,000-update budget for both models and all three seeds. These are averages across the seeds:
+
+| Measure | PHFNO | FNO |
+|---|---:|---:|
+| Selected one-step validation NRMSE | 0.01897 | 0.01954 |
+| Recorded updates to the shared target | 233 | 267 |
+| Optimization seconds to the target | 1.98 | 1.71 |
+| Optimization seconds for all 3,000 updates | 25.11 | 19.21 |
+| Final held-out rollout NRMSE | 0.05999 | 0.05077 |
+
+PHFNO reached a slightly lower one-step validation error and used fewer recorded updates to reach the shared target on average. FNO reached that target sooner in elapsed time and had lower final rollout error. Target crossings are only checked every 100 updates, and three seeds give a limited view of training variability. This result does not establish an overall learning-speed advantage for PHFNO.
+
+Both models followed the broad kinetic-energy decay, but the equation checks exposed remaining errors. Mean derivative errors were roughly 23–64%, predicted divergence was far above the reference, and the learned forcing response remained weak. Good energy curves alone would overstate how much of the Navier–Stokes dynamics the models recovered.
+
+Validation error uses the fixed training RMS. Final rollout error uses each test trajectory's initial RMS and is averaged across the held-out trajectories and flow types. These two columns therefore measure different prediction tasks and use different normalizations.
