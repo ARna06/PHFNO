@@ -48,7 +48,7 @@ def generate_dataset(
     forcing_frequency=1.0,
     cutoff=2,
     max_dt=0.005,
-    noise_level=0.01,
+    noise_level=0.1,
     project_noise=False,
     seed=0,
     device="cuda",
