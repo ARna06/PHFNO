@@ -33,7 +33,7 @@ Consider a real field with several state channels on a periodic domain:
 
 $$
 \begin{aligned}
-\Omega & = (\mathbb R/\mathbb Z)^s, \\[4pt]
+\Omega & = (\mathbb R/\mathbb Z)^s, \\
 v & : \Omega\longrightarrow\mathbb R^{c_v}.
 \end{aligned}
 $$
@@ -46,10 +46,10 @@ $$
 
 $$
 \begin{aligned}
-X_N=\Bigl\{&
+X_N=\{&
 \sum_{k\in\Lambda_N}\widehat{v}(k)e^{2\pi i k\cdot x}: \\
 &\widehat{v}(k)\in\mathbb{C}^{c_v}, \\
-&\widehat{v}(-k)=\overline{\widehat{v}(k)}\Bigr\}.
+&\widehat{v}(-k)=\overline{\widehat{v}(k)}\}.
 \end{aligned}
 $$
 
@@ -57,9 +57,9 @@ The conjugate-pair condition ensures that the reconstructed field is real. Only 
 
 $$
 \begin{aligned}
-E_Nv=\operatorname{concat}_{c=1}^{c_v}\Bigl[&\widehat{v}_c(0), \\
-&\Bigl\{\sqrt{2}\operatorname{Re}\widehat{v}_c(k), \\
-&\qquad\sqrt{2}\operatorname{Im}\widehat{v}_c(k)\Bigr\}_{k\in\Lambda_N^+}\Bigr].
+E_Nv=\mathrm{concat}_{c=1}^{c_v}[&\widehat{v}_c(0), \\
+&\{\sqrt{2}\mathrm{Re}\widehat{v}_c(k), \\
+&\qquad\sqrt{2}\mathrm{Im}\widehat{v}_c(k)\}_{k\in\Lambda_N^+}].
 \end{aligned}
 $$
 
@@ -67,7 +67,7 @@ One consistent choice is to keep frequencies whose first nonzero component is po
 
 $$
 \begin{aligned}
-z & = E_Nv\in\mathbb R^D, \\[4pt]
+z & = E_Nv\in\mathbb R^D, \\
 D & = c_v\prod_{i=1}^{s}(2N_i+1).
 \end{aligned}
 $$
@@ -76,8 +76,8 @@ A normalized fast Fourier transform computes the coefficients from a uniform gri
 
 $$
 \begin{aligned}
-\|E_Nv\|_2^2 & = \int_\Omega\|v(x)\|_2^2\,dx \\[4pt]
-& = \frac1K\sum_{j=1}^{K}\sum_{c=1}^{c_v}|v_c(x_j)|^2, \\[4pt]
+\|E_Nv\|_2^2 & = \int_\Omega\|v(x)\|_2^2\,dx \\
+& = \frac1K\sum_{j=1}^{K}\sum_{c=1}^{c_v}|v_c(x_j)|^2, \\
 v & \in X_N.
 \end{aligned}
 $$
@@ -86,7 +86,7 @@ Here, the channel contributions are summed and the spatial contributions are ave
 
 $$
 \begin{aligned}
-n_i & \ge 2N_i+1, \\[4pt]
+n_i & \ge 2N_i+1, \\
 K & = \prod_{i=1}^{s}n_i.
 \end{aligned}
 $$
@@ -111,8 +111,8 @@ Reconstruct the state on a fixed internal grid, pass it through the Fourier neur
 
 $$
 \begin{aligned}
-&\bigl(a_\theta(z),b_\theta(z), \\
-&\qquad B_{\theta,1}(z),\ldots,B_{\theta,m}(z)\bigr) \\
+&(a_\theta(z),b_\theta(z), \\
+&\qquad B_{\theta,1}(z),\ldots,B_{\theta,m}(z)) \\
 &\quad=E_N\,\mathrm{FNO}_\theta(E_N^{-1}z).
 \end{aligned}
 $$
@@ -121,7 +121,7 @@ The transforms in this expression are evaluated on the fixed internal grid, and 
 
 $$
 \begin{aligned}
-a_\theta(z),b_\theta(z) & \in \mathbb R^D, \\[4pt]
+a_\theta(z),b_\theta(z) & \in \mathbb R^D, \\
 B_\theta(z) & \in \mathbb R^{D\times m}.
 \end{aligned}
 $$
@@ -142,7 +142,7 @@ Two separate networks read the Fourier coordinates directly:
 
 $$
 \begin{aligned}
-H_\theta(z) & = \mathrm{MLP}_H(z), \\[4pt]
+H_\theta(z) & = \mathrm{MLP}_H(z), \\
 d_\theta(z) & = \mathrm{MLP}_d(z).
 \end{aligned}
 $$
@@ -169,7 +169,7 @@ Because the coordinate transform preserves the inner product, the field gradient
 
 $$
 \begin{aligned}
-\mathcal H_\theta(v) & = H_\theta(E_Nv), \\[4pt]
+\mathcal H_\theta(v) & = H_\theta(E_Nv), \\
 \nabla_{X_N}\mathcal H_\theta(v) & = E_N^{-1}\nabla_zH_\theta(E_Nv).
 \end{aligned}
 $$
@@ -182,8 +182,8 @@ The learned vectors define a rank-one operator and its skew-symmetric part:
 
 $$
 \begin{aligned}
-S_\theta(z) & = a_\theta(z)b_\theta(z)^T, \\[4pt]
-J_\theta(z) & = \frac12\left[S_\theta(z)-S_\theta(z)^T\right].
+S_\theta(z) & = a_\theta(z)b_\theta(z)^T, \\
+J_\theta(z) & = \frac12[S_\theta(z)-S_\theta(z)^T].
 \end{aligned}
 $$
 
@@ -191,7 +191,7 @@ The damping operator is a squared scalar times the identity:
 
 $$
 \begin{aligned}
-L_\theta(z) & = d_\theta(z)I, \\[4pt]
+L_\theta(z) & = d_\theta(z)I, \\
 R_\theta(z) & = L_\theta(z)^TL_\theta(z)=d_\theta(z)^2I.
 \end{aligned}
 $$
@@ -200,8 +200,8 @@ These operators can be applied directly to the effort:
 
 $$
 \begin{aligned}
-J_\theta(z)e & = \frac{1}{2}a_\theta(z)\bigl(b_\theta(z)^Te\bigr) \\
-&\quad-\frac{1}{2}b_\theta(z)\bigl(a_\theta(z)^Te\bigr), \\[4pt]
+J_\theta(z)e & = \frac{1}{2}a_\theta(z)(b_\theta(z)^Te) \\
+&\quad-\frac{1}{2}b_\theta(z)(a_\theta(z)^Te), \\
 R_\theta(z)e & = d_\theta(z)^2e.
 \end{aligned}
 $$
@@ -212,8 +212,8 @@ Combining internal energy exchange, damping, and external forcing gives
 
 $$
 \begin{aligned}
-\dot z & = f_\theta(z,u) \\[4pt]
-& = \bigl[J_\theta(z)-R_\theta(z)\bigr]e_\theta(z)+B_\theta(z)u.
+\dot z & = f_\theta(z,u) \\
+& = [J_\theta(z)-R_\theta(z)]e_\theta(z)+B_\theta(z)u.
 \end{aligned}
 $$
 
@@ -227,7 +227,7 @@ Skew symmetry makes the internal exchange term contribute zero power. Squaring t
 
 $$
 \begin{aligned}
-\frac{dH_\theta}{dt} & = e_\theta(z)^T\dot z \\[4pt]
+\frac{dH_\theta}{dt} & = e_\theta(z)^T\dot z \\
 & = -d_\theta(z)^2\|e_\theta(z)\|^2+y^Tu.
 \end{aligned}
 $$
@@ -242,7 +242,7 @@ Time integration uses explicit Euler, with each input held constant over its tim
 
 $$
 \begin{aligned}
-z_{j+1} & = z_j+\Delta t_j f_\theta(z_j,u_j), \\[4pt]
+z_{j+1} & = z_j+\Delta t_j f_\theta(z_j,u_j), \\
 \widehat v_{j+1} & = E_N^{-1}z_{j+1}.
 \end{aligned}
 $$
@@ -256,7 +256,7 @@ $$
 \mathcal{L}(\theta)
 &=\frac{1}{n_{\mathrm{pairs}}c_vK}
 \sum_{r=1}^{n_{\mathrm{pairs}}}\sum_{c=1}^{c_v}\sum_{j=1}^{K} \\
-&\qquad\times\left|\widehat{v}_{r,c}(x_j)-v^{\mathrm{target}}_{r,c}(x_j)\right|^2.
+&\qquad\times|\widehat{v}_{r,c}(x_j)-v^{\mathrm{target}}_{r,c}(x_j)|^2.
 \end{aligned}
 $$
 
@@ -279,8 +279,8 @@ A comparison model can predict the state derivative directly with an ordinary Fo
 $$
 \begin{aligned}
 f_{\mathrm{FNO}}(v,u)
-&=P_N\,\mathrm{FNO}_\phi\Bigl( \\
-&\qquad\operatorname{concat}\bigl[P_Nv,\operatorname{broadcast}(u)\bigr]\Bigr).
+&=P_N\,\mathrm{FNO}_\phi( \\
+&\qquad\mathrm{concat}[P_Nv,\mathrm{broadcast}(u)]).
 \end{aligned}
 $$
 
