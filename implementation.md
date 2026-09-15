@@ -45,23 +45,22 @@ $$
 $$
 
 $$
-X_N=\left\{
-\sum_{k\in\Lambda_N}\widehat v(k)e^{2\pi i k\cdot x}:
-\widehat v(k)\in\mathbb C^{c_v},\quad
-\widehat v(-k)=\overline{\widehat v(k)}
-\right\}.
+\begin{aligned}
+X_N=\Bigl\{&
+\sum_{k\in\Lambda_N}\widehat{v}(k)e^{2\pi i k\cdot x}: \\
+&\widehat{v}(k)\in\mathbb{C}^{c_v}, \\
+&\widehat{v}(-k)=\overline{\widehat{v}(k)}\Bigr\}.
+\end{aligned}
 $$
 
 The conjugate-pair condition ensures that the reconstructed field is real. Only one coefficient from each nonzero pair needs to be stored. For each channel, place the zero coefficient first, followed by the real and imaginary parts of the retained representatives:
 
 $$
-E_Nv=
-\operatorname{concat}_{c=1}^{c_v}
-\left[
-\widehat v_c(0),
-\left\{\sqrt2\operatorname{Re}\widehat v_c(k),
-       \sqrt2\operatorname{Im}\widehat v_c(k)\right\}_{k\in\Lambda_N^+}
-\right].
+\begin{aligned}
+E_Nv=\operatorname{concat}_{c=1}^{c_v}\Bigl[&\widehat{v}_c(0), \\
+&\Bigl\{\sqrt{2}\operatorname{Re}\widehat{v}_c(k), \\
+&\qquad\sqrt{2}\operatorname{Im}\widehat{v}_c(k)\Bigr\}_{k\in\Lambda_N^+}\Bigr].
+\end{aligned}
 $$
 
 One consistent choice is to keep frequencies whose first nonzero component is positive, ordered lexicographically. The resulting state is an ordinary real vector:
@@ -111,8 +110,11 @@ The learned maps consist of one shared Fourier neural operator and two scalar ne
 Reconstruct the state on a fixed internal grid, pass it through the Fourier neural operator, and divide its output into groups. Two groups supply the factors for internal energy exchange; the remaining groups supply one field per control channel. Convert each output group back into real Fourier coordinates:
 
 $$
-\bigl(a_\theta(z),b_\theta(z),B_{\theta,1}(z),\ldots,B_{\theta,m}(z)\bigr)
-=E_N\,\mathrm{FNO}_\theta(E_N^{-1}z).
+\begin{aligned}
+&\bigl(a_\theta(z),b_\theta(z), \\
+&\qquad B_{\theta,1}(z),\ldots,B_{\theta,m}(z)\bigr) \\
+&\quad=E_N\,\mathrm{FNO}_\theta(E_N^{-1}z).
+\end{aligned}
 $$
 
 The transforms in this expression are evaluated on the fixed internal grid, and the output transform acts separately on each group. The resulting dimensions are
@@ -198,7 +200,8 @@ These operators can be applied directly to the effort:
 
 $$
 \begin{aligned}
-J_\theta(z)e & = \frac12\left[a_\theta(z)\bigl(b_\theta(z)^Te\bigr) -b_\theta(z)\bigl(a_\theta(z)^Te\bigr)\right], \\[4pt]
+J_\theta(z)e & = \frac{1}{2}a_\theta(z)\bigl(b_\theta(z)^Te\bigr) \\
+&\quad-\frac{1}{2}b_\theta(z)\bigl(a_\theta(z)^Te\bigr), \\[4pt]
 R_\theta(z)e & = d_\theta(z)^2e.
 \end{aligned}
 $$
@@ -249,10 +252,12 @@ Each step converts the current field to coordinates, evaluates the learned state
 Training uses observed current fields, their controls, and the corresponding next fields. The mean squared prediction error is
 
 $$
-\mathcal L(\theta)
-=\frac{1}{n_{\mathrm{pairs}}c_vK}
-\sum_{r=1}^{n_{\mathrm{pairs}}}\sum_{c=1}^{c_v}\sum_{j=1}^{K}
-\left|\widehat v_{r,c}(x_j)-v^{\mathrm{target}}_{r,c}(x_j)\right|^2.
+\begin{aligned}
+\mathcal{L}(\theta)
+&=\frac{1}{n_{\mathrm{pairs}}c_vK}
+\sum_{r=1}^{n_{\mathrm{pairs}}}\sum_{c=1}^{c_v}\sum_{j=1}^{K} \\
+&\qquad\times\left|\widehat{v}_{r,c}(x_j)-v^{\mathrm{target}}_{r,c}(x_j)\right|^2.
+\end{aligned}
 $$
 
 This averages over training pairs, state channels, and spatial points. The training cycle is straightforward:
@@ -272,9 +277,11 @@ Explicit Euler does not preserve the continuous energy balance exactly at a fini
 A comparison model can predict the state derivative directly with an ordinary Fourier neural operator. Project the current field into the retained space, broadcast the controls across its grid, and concatenate them with the state. Project the predicted derivative back into the same Fourier space:
 
 $$
+\begin{aligned}
 f_{\mathrm{FNO}}(v,u)
-=P_N\,\mathrm{FNO}_\phi
-\left(\operatorname{concat}\bigl[P_Nv,\operatorname{broadcast}(u)\bigr]\right).
+&=P_N\,\mathrm{FNO}_\phi\Bigl( \\
+&\qquad\operatorname{concat}\bigl[P_Nv,\operatorname{broadcast}(u)\bigr]\Bigr).
+\end{aligned}
 $$
 
 Both models use the same Euler update, control convention, and prediction loss. The unconstrained model evaluates its operator on the external grid; the structured model evaluates its factor-generating operator on a fixed internal grid. Matching widths and depths does not imply equal parameter counts or computational cost.
