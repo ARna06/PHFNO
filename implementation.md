@@ -46,7 +46,9 @@ $$
 
 $$
 \begin{aligned}
-X_N=\{&\sum_{k\in\Lambda_N}\widehat{v}(k)e^{2\pi i k\cdot x}: \\&\widehat{v}(k)\in\mathbb{C}^{c_v}, \\&\widehat{v}(-k)=\overline{\widehat{v}(k)}\}.
+X_N &= \Bigl\lbrace \sum_{k\in\Lambda_N}\widehat{v}(k)e^{2\pi i k\cdot x} : \\
+&\qquad \widehat{v}(k)\in\mathbb{C}^{c_v}, \\
+&\qquad \widehat{v}(-k)=\overline{\widehat{v}(k)} \Bigr\rbrace.
 \end{aligned}
 $$
 
@@ -54,7 +56,9 @@ The conjugate-pair condition ensures that the reconstructed field is real. Only 
 
 $$
 \begin{aligned}
-E_Nv=\mathrm{concat}_{c=1}^{c_v}[&\widehat{v}_c(0), \\&\{\sqrt{2}\mathrm{Re}\widehat{v}_c(k), \\&\qquad\sqrt{2}\mathrm{Im}\widehat{v}_c(k)\}_{k\in\Lambda_N^+}].
+E_Nv &= \operatorname{concat}_{c=1}^{c_v}\Bigl[\widehat{v}_c(0), \\
+&\qquad \bigl(\sqrt{2}\operatorname{Re}\widehat{v}_c(k),
+\sqrt{2}\operatorname{Im}\widehat{v}_c(k)\bigr)_{k\in\Lambda_N^+}\Bigr].
 \end{aligned}
 $$
 
