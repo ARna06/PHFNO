@@ -109,8 +109,8 @@ def test_notebook_is_code_only_and_uses_separate_cuda_evaluation():
     notebook = json.loads(path.read_text())
     source = "\n".join("".join(cell["source"]) for cell in notebook["cells"])
     assert all(cell["cell_type"] == "code" for cell in notebook["cells"])
-    assert notebook["metadata"]["kernelspec"]["name"] == "research"
-    assert 'Path(sys.prefix).name != "research"' in source
+    assert notebook["metadata"]["kernelspec"]["name"] == "python3"
+    assert "Path(sys.prefix).name" not in source
     assert "torch.cuda.is_available()" in source
     assert 'device="cuda"' in source
     assert "run_long_comparison(" in source

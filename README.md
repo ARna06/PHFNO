@@ -10,8 +10,8 @@ trajectories. The reusable code lives in `src/phfno/`.
 
 <!-- Audit fix: describe the notebook's shared device choice and actual run configuration. -->
 The [Navier–Stokes comparison notebook](ipynb/compare_phfno_fno.ipynb)
-trains both models on the saved noisy datasets using CUDA. Run its cells in order
-with the **research** kernel to see learning curves, held-out rollouts, velocity
+trains both models on generated noisy datasets using CUDA. Follow the setup below,
+then run its cells in order to see learning curves, held-out rollouts, velocity
 slices, and checks against the forcing, dissipation, and Navier–Stokes derivatives.
 The [experiment guide](experiments.md) explains the split, metrics, and limitations.
 The current comparison uses an implicit AVF step for both models, an explicit
@@ -27,41 +27,41 @@ numerical results are saved under `results/local_smoke_test_seeds_8_18_28/`.
 
 ## Reproduce the notebook results
 
-These steps reproduce the **time 0–1 AVF comparisons**. Run shell commands from
-the repository root. The two comparison notebooks require CUDA and the
-`research` conda environment; the small assembly demonstration also supports CPU.
+These steps start from a fresh checkout with **no dataset or checkpoint `.pt`
+files**. You will generate the datasets, train both models, and use the checkpoints
+you create for inference. Git includes notebooks and JSON summaries, but excludes
+the generated `.pt` files; summaries alone cannot run inference.
+
+The workflow covers the **time 0–1 AVF comparisons**. Run shell commands from the
+repository root. You need Conda and an NVIDIA GPU with a CUDA-compatible driver
+for the comparison notebooks; the small assembly demonstration also supports CPU.
 
 ### 1. Prepare the notebook kernel
 
-Use the existing `research` environment with CUDA-enabled PyTorch:
+Create a new environment and install the project and notebook tools:
 
 ```bash
-conda activate research
+conda create -n neuralpde python=3.11 pip -y
+conda activate neuralpde
+python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
 python -m pip install -e '.[notebook,test]'
-python -m ipykernel install --user --name research --display-name 'Python (research)'
+python -m pip install jupyterlab
+python -m ipykernel install --user --name neuralpde --display-name 'Python (neuralPDE)'
 python -c "import sys, torch; print(sys.executable, torch.__version__); assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
 ```
 
-Open the notebooks in VS Code or Jupyter, select **Python (research)**, and run
-cells from the top. The recorded runs used Python 3.11, PyTorch `2.11.0+cu128`,
-and NeuralOperator `2.0.0`. Matching versions and seeds helps reproducibility;
-different hardware/software can still change floating-point results.
+The final command must succeed and print your GPU name before proceeding. The
+PyTorch command installs the CUDA 12.8 build used for the recorded runs; your
+NVIDIA driver must support it. The project pins NeuralOperator to `2.0.0`.
+Different hardware/software can still change floating-point results.
 
-### 2. Choose saved results or a fresh run
+Open the repository in VS Code, or run `jupyter lab` from the repository root.
+Select **Python (neuralPDE)** for each notebook, overriding any saved kernel
+selection. Run cells from the top in the order described below.
 
-- **Existing workspace with `.pt` files:** keep the notebook paths unchanged.
-  Re-running the velocity notebook reuses completed matching runs. The vorticity
-  notebook loads a complete matching comparison. Neither retrains completed runs.
-- **Fresh clone or new experiment:** use the fresh directories below. Git stores
-  notebooks, configuration, and JSON summaries, but `.gitignore` excludes dataset
-  and checkpoint `.pt` files. A JSON summary alone cannot run inference.
+### 2. Generate the comparison datasets
 
-Use new output directories when changing data or configuration. Cache checks
-compare dataset hashes and experiment settings, and deliberately reject mismatches.
-
-### 3. Generate the comparison datasets
-
-For a fresh run, generate all three flow families into a new directory:
+Generate all three flow families into a new directory:
 
 ```bash
 PYTHONPATH=src python -m nsdata \
@@ -96,7 +96,7 @@ For this fresh run, edit the following path assignments before running cells:
 
 For example: `data_directory = root / "datasets" / "reproduce_avf"`.
 
-### 4. Train and evaluate the models
+### 3. Train and save the models
 
 1. Run [compare_phfno_fno.ipynb](ipynb/compare_phfno_fno.ipynb) completely.
    Its `run_comparison(...)` cell trains the velocity models, restores each
@@ -124,6 +124,14 @@ Each comparison output directory contains:
 - `config.json` and `summary.json`: experiment provenance and readable statistics.
 - The vorticity directory also contains `velocity_reference.json`.
 
+Finish both notebooks before moving to inference. You should now have six model
+checkpoints and a `results.pt` file in each of `results/reproduce_velocity_avf/`
+and `results/reproduce_vorticity_avf/`. The plotting cells show learning curves,
+held-out errors, energy curves, and physical diagnostics inline.
+
+Later runs reuse completed results when data and configuration match. Choose new
+output directories if you change either; cache checks reject mismatches.
+
 To resume an interrupted vorticity comparison that has only partial results,
 run this in place of its cached-results cell, after the setup cells:
 
@@ -140,11 +148,17 @@ interrupted, checkpoints containing `training_run` also preserve the selected
 weights and training history. An interruption during training itself restarts
 that unfinished model; optimizer state is not saved for mid-training continuation.
 
-### 5. Run inference from a checkpoint without training
+### 4. Run inference using your generated checkpoints
 
-In either comparison notebook, run only its setup/data/configuration cells first,
-stopping before the training/results cell. This defines `datasets`, `output`, and
-`device`. With checkpoints already present, execute the following in a new cell:
+After completing step 3, restart either comparison notebook's kernel. Keep the
+paths from step 2 and run only its setup/data/configuration cells, stopping before
+the training/results cell. This defines `datasets`, `output`, and `device`.
+In the velocity notebook, the `output = ...` assignment shares a cell with
+`run_comparison(...)`: execute just that assignment, or copy it into your new
+inference cell. Do not run the `run_comparison(...)` call for this step.
+
+Execute the following in a new cell. It loads a checkpoint **you trained in step
+3**; `output` selects the velocity or vorticity model directory:
 
 ```python
 from dataclasses import replace
@@ -380,21 +394,14 @@ notebook measures both models on the same data and reports their different costs
 | [assembly notebook](ipynb/assemble_phfno.ipynb) | Worked example and short training loop |
 | [tests/](tests/) | Small checks of the mathematics and gradient flow |
 
-## Run it
+## Run the tests
 
-Select the **research** kernel in the notebook. It already adds `src/` to its
-import path. The local environment uses PyTorch `2.11.0+cu128` and
-`neuraloperator==2.0.0`; validation covers CPU and CUDA.
+After installing the project as described above, activate your environment and
+run the tests from the repository root:
 
 ```bash
-conda activate research
+conda activate neuralpde
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q
-```
-
-For an editable installation in an environment with PyTorch available:
-
-```bash
-python -m pip install -e '.[notebook,test]'
 ```
 
 Use float32 for the FNO. During evaluation, use `model.eval()` with
