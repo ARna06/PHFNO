@@ -114,5 +114,56 @@ def test_baseline_matches_derivative_step_and_rollout_interfaces():
     assert_trainable_gradients(model.operator)
     with torch.no_grad():
         assert not model(field, u).requires_grad
-    with pytest.raises(ValueError, match="only Euler"):
+    # The baseline now supports AVF as well as Euler; reject only unknown methods.
+    with pytest.raises(ValueError, match="'avf' or 'euler'"):
         model.step(field, u, 0.01, method="unsupported")
+
+
+@pytest.mark.parametrize("kind", [PHFNO, FNOBaseline])
+def test_avf_rollout_preserves_gradients_and_solver_options(kind):
+    # Exercise actual networks and multiple steps, including PhFNO's energy Hessian.
+    torch.manual_seed(31)
+    options = dict(cutoff=(1,), state_channels=1, control_channels=1,
+                   hidden_channels=4, n_layers=1)
+    if kind is PHFNO:
+        options.update(mlp_width=8, parameter_grid=(8,))
+    model = kind(**options)
+    initial = torch.randn(2, 1, 8, requires_grad=True)
+    controls = torch.randn(2, 2, 1, requires_grad=True)
+    times = torch.tensor([0.0, 0.01, 0.03])
+    solver_options = {"max_iterations": 64, "quadrature_points": 2}
+    trajectory = model.rollout(initial, controls, times, method="avf",
+                               solver_options=solver_options)
+    with torch.no_grad():
+        expected = model.rollout(initial, controls, times, method="avf",
+                                 solver_options=solver_options)
+    torch.testing.assert_close(trajectory, expected)
+    trajectory[:, -1].square().mean().backward()
+    assert_trainable_gradients(model)
+    assert torch.isfinite(initial.grad).all()
+    assert torch.isfinite(controls.grad).all()
+    assert (controls.grad.abs().sum(dim=(0, 2)) > 0).all()
+    # An invalid solver setting must reach the integrator rather than be ignored.
+    with pytest.raises(ValueError, match="max_iterations"):
+        model.step(initial, controls[:, 0], 0.01, method="avf",
+                   solver_options={"max_iterations": 0})
+
+
+def test_baseline_avf_has_the_same_coordinate_norm_across_grids(monkeypatch):
+    # For a resolution-independent derivative, the same Fourier state must take
+    # the same numerical step and satisfy the same absolute tolerance on each grid.
+    model = FNOBaseline((0,), 2, hidden_channels=2, n_layers=1)
+
+    def rhs(field, control):
+        result = torch.zeros_like(field)
+        result[:, 1] = field[:, 0] - 4 * field[:, 1]
+        return result
+
+    monkeypatch.setattr(model, "forward", rhs)
+    z = torch.tensor([[1.0, 0.0]])
+    results = []
+    with torch.no_grad():
+        for grid in ((4,), (32,)):
+            field = model.coordinates.decode(z, grid)
+            results.append(model.coordinates.encode(model.step(field, None, 0.1, method="avf")))
+    torch.testing.assert_close(results[0], results[1], atol=1e-7, rtol=0)

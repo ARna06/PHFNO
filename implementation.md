@@ -1,6 +1,6 @@
 # A Fourier port-Hamiltonian model for controlled field dynamics
 
-The construction combines a Fourier neural operator (FNO) with two small neural networks for energy and damping. The field is represented by a finite set of Fourier coordinates. PyTorch automatic differentiation computes the energy gradient, and the learned operators turn that gradient into a state derivative. An explicit Euler step advances the state in time.
+The construction combines a Fourier neural operator (FNO) with two small neural networks for energy and damping. The field is represented by a finite set of Fourier coordinates. PyTorch automatic differentiation computes the energy gradient, and the learned operators turn that gradient into a state derivative. An implicit Average Vector Field (AVF) step advances the state in time.
 
 ## 1. Overview of the procedure
 
@@ -17,9 +17,9 @@ flowchart TD
     effort --> dynamics
     damping --> dynamics
     control["External input u"] --> dynamics
-    dynamics --> euler["Euler step in Fourier coordinates"]
-    encode --> euler
-    euler --> prediction["Reconstruct the predicted next field"]
+    dynamics --> avf["Implicit AVF step in Fourier coordinates"]
+    encode --> avf
+    avf --> prediction["Reconstruct the predicted next field"]
     prediction --> loss["Mean squared prediction error"]
     target["Observed next field"] --> loss
     loss --> update["Backpropagate and update the learned parameters"]
@@ -235,41 +235,90 @@ The final term measures power supplied through the input. With zero input, the l
 
 This identity does not require the learned energy to be positive, and it does not establish that the network has recovered a system's physical energy. The chosen structure also imposes two restrictions: the skew operator has rank at most two, and damping acts with the same scalar strength in every coordinate direction.
 
-## 6. Advance the state and train on observed transitions
+## 6. Leray projection, advance the state, and train
 
-Time integration uses explicit Euler, with each input held constant over its time interval:
+The Navier–Stokes data solver already used the Leray projector before this
+ablation. In Fourier coordinates, for every nonzero wavevector \(k\), it is
+
+$$
+\mathbb P(k)=I-\frac{kk^T}{|k|^2},
+$$
+
+with the zero mode set to zero. It is now exposed as
+`PeriodicNavierStokes.leray_project` and is used for the velocity, nonlinear
+term, forcing, and each RK4 stage. The FFT was not removed: the projector is
+an operator, while FFT is the periodic-grid algorithm used to represent and
+apply it.
+
+<!-- Audit fix: the comparison selects AVF explicitly; public model defaults are documented below. -->
+The comparison uses the implicit AVF update, with each input held constant over
+its time interval:
 
 $$
 \begin{aligned}
-z_{j+1} & = z_j+\Delta t_j f_\theta(z_j,u_j), \\
+z_{j+1} & = z_j+\Delta t_j\int_0^1
+f_\theta((1-\xi)z_j+\xi z_{j+1},u_j)\,d\xi, \\
 \widehat v_{j+1} & = E_N^{-1}z_{j+1}.
 \end{aligned}
 $$
 
 Each step converts the current field to coordinates, evaluates the learned state derivative, advances the coordinates, and reconstructs the next field. Repeating this process produces a trajectory from the projected initial field. The time intervals may be nonuniform.
 
-Training uses observed current fields, their controls, and the corresponding next fields. The mean squared prediction error is
+<!-- Audit fix: match the actual normalized Fourier H1 training loss instead of MSE. -->
+Training uses observed current fields, their controls, and the corresponding next fields. Let
+\(e=\widehat v-v^{\mathrm{target}}\), and let \(\widehat e\) be its orthonormal
+FFT on the unit periodic domain. The comparison's prediction loss is
 
 $$
 \begin{aligned}
 \mathcal{L}(\theta)
-&=\frac{1}{n_{\mathrm{pairs}}c_vK}
-\sum_{r=1}^{n_{\mathrm{pairs}}}\sum_{c=1}^{c_v}\sum_{j=1}^{K} \\
-&\qquad\times|\widehat{v}_{r,c}(x_j)-v^{\mathrm{target}}_{r,c}(x_j)|^2.
+&=\frac{1}{s^2 n_{\mathrm{pairs}}c_vK}
+\sum_{r=1}^{n_{\mathrm{pairs}}}\sum_{c=1}^{c_v}\sum_k
+\left(1+4\pi^2\|k\|^2\right)|\widehat e_{r,c}(k)|^2.
 \end{aligned}
 $$
 
-This averages over training pairs, state channels, and spatial points. The training cycle is straightforward:
+Here \(s\) is the fixed RMS of the noisy training inputs. The loss averages over
+training pairs, state channels, and Fourier modes, weighting spatial derivatives
+as well as field errors. Validation NRMSE uses ordinary field RMSE divided by
+the same scale. The training cycle is straightforward:
 
 1. Select a batch of observed transitions and their inputs.
 2. Predict each next field using the observed interval length.
-3. Compute the mean squared error against the next-field targets.
+3. Compute the normalized H1 loss against the next-field targets.
 4. Differentiate the loss through the update and the energy gradient.
 5. Update the parameters of the field, energy, and damping networks together.
 
 One-step training starts every prediction from an observation. A rollout instead feeds predictions back into the model, so errors can accumulate across time. Differentiation through a rollout is supported, although it uses more memory as the number of steps increases. Learning the input map requires data that exercises the control channels; zero-input trajectories alone cannot identify it.
 
-Explicit Euler does not preserve the continuous energy balance exactly at a finite step size. Gonzalez discrete gradients could be considered later, together with a compatible time integrator, when a discrete energy balance is needed. They are not part of the present procedure: the energy gradient is obtained by automatic differentiation, and the state is advanced with Euler steps.
+<!-- Audit fix: document solver configuration, implicit sensitivities, and the state-dependent energy limitation. -->
+The AVF line integral uses four-point Gauss–Legendre quadrature and up to 50
+fixed-point iterations by default. `solver_options` on `step` and `rollout`
+controls the solver settings. A nonconvergent or nonfinite step raises an error;
+training obtains first-order gradients from the converged implicit equation.
+Higher-order derivatives of the complete AVF step are explicitly unsupported;
+the energy Hessian required inside PhFNO's ordinary training gradient is supported.
+Fixed-point convergence still depends on the learned dynamics and interval length.
+
+Public PhFNO calls default to Gonzalez, and public FNO calls default to Euler;
+the comparison explicitly selects AVF for both throughout training and evaluation.
+PhFNO evaluates its state-dependent structure matrices along the quadrature
+segment. This does not satisfy the constant-structure assumption behind the
+usual AVF energy identity. Together with numerical quadrature, this means AVF
+does not guarantee exact learned-energy conservation, monotonicity, or discrete
+passivity here. The existing Gonzalez discrete-gradient construction is also
+available; the model architecture is unchanged.
+
+<!-- Audit fix: accumulation groups count minibatches, and their final partial group also updates. -->
+Losses are evaluated on every minibatch. Parameters are updated every
+step through step 20, then gradients are accumulated over five minibatches
+before one Adam update. The loss is divided by the active accumulation interval,
+so each update uses the mean accumulated gradient. These settings are recorded
+as `theta_update_start=20` and `theta_update_interval=5` in
+`ComparisonConfig`; setting the interval to 10 runs the ten-step variant.
+Here each transition iteration processes one sampled minibatch. With the default
+schedule, 600 minibatch iterations produce 136 Adam updates, and 3,000 produce
+616. Histories record both counters; the learning-curve step axis counts minibatches.
 
 ## 7. Compare with an unconstrained Fourier neural operator
 
@@ -283,7 +332,7 @@ f_{\mathrm{FNO}}(v,u)
 \end{aligned}
 $$
 
-Both models use the same Euler update, control convention, and prediction loss. The unconstrained model evaluates its operator on the external grid; the structured model evaluates its factor-generating operator on a fixed internal grid. Matching widths and depths does not imply equal parameter counts or computational cost.
+Both models use the same AVF update, control convention, and prediction loss. The unconstrained model evaluates its operator on the external grid; the structured model evaluates its factor-generating operator on a fixed internal grid. Matching widths and depths does not imply equal parameter counts or computational cost.
 
 This comparison asks what changes when a learned vector field is given an explicit energy structure. It differs from training a Fourier neural operator to map an initial field directly to a distant final state.
 

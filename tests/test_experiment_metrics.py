@@ -135,3 +135,20 @@ def test_empty_split_is_rejected():
     data, rate = wave_data()
     with pytest.raises(ValueError, match="at least one"):
         evaluate_model(DecayModel(rate), data, [], device="cpu")
+
+
+def test_evaluation_forwards_selected_method_and_solver_settings(monkeypatch):
+    # A metric helper must never drop the experiment's chosen discrete dynamics.
+    data, rate = wave_data()
+    model = DecayModel(rate)
+    original = model.rollout
+    received = []
+    options = {"max_iterations": 31, "rtol": 1e-7}
+
+    def rollout(initial, controls, times, method, solver_options):
+        received.append((method, solver_options))
+        return original(initial, controls, times)
+
+    monkeypatch.setattr(model, "rollout", rollout)
+    evaluate_model(model, data, [0], device="cpu", method="avf", solver_options=options)
+    assert received == [("avf", options)]

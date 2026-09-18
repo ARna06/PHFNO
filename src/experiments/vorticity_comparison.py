@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from .comparison import build_model, copy_state, parameter_count, prepare_transitions, summarize_run, train_model
+from .comparison import ComparisonConfig, build_model, copy_state, parameter_count, prepare_transitions, summarize_run, train_model
 from .vorticity_metrics import evaluate_vorticity_model
 from .vorticity_operators import PeriodicVorticity
 
@@ -25,12 +25,17 @@ def vorticity_dataset(data, device="cuda", batch_size=32):
 
 def validate_velocity_reference(reference, datasets, config):
     expected = asdict(config)
-    for key in ("seeds", "train_indices", "validation_indices", "test_indices", "cutoff"):
-        if tuple(reference["config"][key]) != tuple(expected[key]):
-            raise ValueError(f"The velocity reference uses different {key}")
-    for key in ("hidden_channels", "n_layers", "mlp_width", "steps", "batch_size",
-                "learning_rate", "eval_every", "gradient_clip"):
-        if reference["config"][key] != expected[key]:
+    # Legacy records cannot prove matched integration, accumulation and loss protocols.
+    recorded = reference["config"]
+    ComparisonConfig.from_record(recorded)
+    for key, value in expected.items():
+        # Hardware and progress output may differ without changing the experiment protocol.
+        if key in ("device", "progress"):
+            continue
+        if key not in recorded:
+            raise ValueError(f"The velocity reference is missing protocol field {key}")
+        actual = tuple(recorded[key]) if isinstance(value, tuple) else recorded[key]
+        if actual != value:
             raise ValueError(f"The velocity reference uses different {key}")
     if list(reference["families"]) != list(datasets):
         raise ValueError("The velocity reference uses different flow families")
@@ -78,7 +83,9 @@ def run_vorticity_comparison(datasets, config, output_dir, velocity_reference=No
         raise ValueError("Training vorticity must have positive RMS")
     persistence = (validation["field"] - validation["clean_target"]).square().mean().sqrt().item() / scale
     hardware = torch.cuda.get_device_name(config.device) if torch.device(config.device).type == "cuda" else "CPU"
-    results = {"config": asdict(config), "families": list(datasets), "training_rms": scale,
+    # Record evaluation explicitly so velocity/vorticity runs have an auditable protocol.
+    results = {"config": asdict(config), "evaluation_method": config.integration_method,
+               "families": list(datasets), "training_rms": scale,
                "persistence_validation_nrmse": persistence, "hardware": hardware,
                "torch_version": str(torch.__version__), "runs": [],
                "state_representation": "vorticity", "validation_representation": "vorticity",
@@ -94,11 +101,17 @@ def run_vorticity_comparison(datasets, config, output_dir, velocity_reference=No
                 torch.cuda.manual_seed_all(seed)
             model = build_model(name, config, grid_shape)
             run = train_model(model, training, validation, config, seed, scale, persistence * 0.5)
-            run.update(model=name, seed=seed, parameter_count=parameter_count(model))
+            run.update(model=name, seed=seed, parameter_count=parameter_count(model),
+                       evaluation_method=config.integration_method)
             torch.save({"state_dict": copy_state(model), "config": asdict(config), "model": name,
-                        "seed": seed, "best_step": run["best_step"], "state_representation": "vorticity"},
+                        "seed": seed, "best_step": run["best_step"],
+                        "best_optimizer_updates": run["best_optimizer_updates"],
+                        "state_representation": "vorticity"},
                        output_dir / f"{name}_{seed}.pt")
-            run["test"] = {family: evaluate_vorticity_model(model, data, config.test_indices, config.device)
+            # Match training AVF settings through both the evaluator and velocity adapter.
+            run["test"] = {family: evaluate_vorticity_model(model, data, config.test_indices, config.device,
+                                                           method=config.integration_method,
+                                                           solver_options=config.solver_options)
                            for family, data in datasets.items()}
             results["runs"].append(run)
             torch.save(results, output_dir / "results.pt")

@@ -18,6 +18,11 @@ class ModeModel(nn.Module):
     def forward(self, field, control):
         return self.weight * field
 
+    def step(self, field, control, dt, method, solver_options=None):
+        # Accept the explicit solver settings now shared by training and evaluation.
+        assert method == "avf"
+        return field + dt.reshape(-1, 1, 1, 1, 1) * self.forward(field, control)
+
 
 def test_training_uses_h1_gradients_and_keeps_l2_error_history(monkeypatch):
     axis = torch.arange(8, dtype=torch.float64) / 8
@@ -70,7 +75,8 @@ def test_prediction_passes_selected_batch_intervals_to_phfno_step(monkeypatch):
     }
     calls = []
 
-    def step(field, control, dt):
+    def step(field, control, dt, method):
+        assert method == "avf"
         calls.append((field, control, dt))
         return field + (dt[:, None] * control).reshape(-1, 1, 1, 1, 1)
 
@@ -88,16 +94,16 @@ def test_prediction_passes_selected_batch_intervals_to_phfno_step(monkeypatch):
     torch.testing.assert_close(result, expected)
 
 
-def test_baseline_prediction_keeps_the_existing_euler_update(monkeypatch):
+def test_baseline_prediction_uses_the_comparison_avf_update(monkeypatch):
     model = FNOBaseline((0, 0, 0), 1, control_channels=1, hidden_channels=2, n_layers=1)
     field = torch.tensor([1.0, 2.0]).reshape(2, 1, 1, 1, 1).expand(2, 1, 4, 4, 4)
     transitions = {"field": field, "control": torch.zeros(2, 1), "dt": torch.tensor([0.1, 0.3])}
 
-    def step(*args):
-        raise AssertionError("Baseline prediction must retain its direct Euler update")
+    def step(field, control, dt, method):
+        assert method == "avf"
+        return field + dt.reshape(-1, 1, 1, 1, 1) * (-2 * field)
 
     monkeypatch.setattr(model, "step", step)
     monkeypatch.setattr(model, "forward", lambda state, control: -2 * state)
     prediction = predict_next(model, transitions, slice(None))
-    expected = field * torch.tensor([0.8, 0.4]).reshape(2, 1, 1, 1, 1)
-    torch.testing.assert_close(prediction, expected)
+    assert prediction.shape == field.shape

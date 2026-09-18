@@ -1,4 +1,20 @@
+import math
+from numbers import Integral
+
 import torch
+
+
+def _validate_dt(dt, z):
+    dt = torch.as_tensor(dt, device=z.device, dtype=z.dtype)
+    if dt.ndim == 0:
+        valid_shape = True
+    else:
+        valid_shape = dt.shape == (z.shape[0],) or dt.shape == (z.shape[0], 1)
+    if not valid_shape or not torch.isfinite(dt).all() or not (dt > 0).all():
+        raise ValueError("dt must be a finite positive scalar or one value per batch item")
+    if dt.ndim != 0:
+        dt = dt.reshape((z.shape[0],) + (1,) * (z.ndim - 1))
+    return dt
 
 
 def energy_gradient(energy, z, create_graph=None):
@@ -7,6 +23,7 @@ def energy_gradient(energy, z, create_graph=None):
     if z.ndim != 2:
         raise ValueError("z must have shape [batch, coordinates]")
     if create_graph is None:
+        # Training differentiates through this gradient; evaluation only needs its value.
         create_graph = torch.is_grad_enabled()
     with torch.enable_grad():
         if not z.requires_grad:
@@ -23,10 +40,121 @@ def energy_gradient(energy, z, create_graph=None):
 
 
 def euler_step(rhs, z, u, dt):
-    dt = torch.as_tensor(dt, device=z.device, dtype=z.dtype)
-    if dt.ndim != 0 or not torch.isfinite(dt).item() or dt.item() <= 0:
-        raise ValueError("dt must be a finite positive scalar")
+    dt = _validate_dt(dt, z)
     return z + dt * rhs(z, u)
+
+
+def avf_step(rhs, z, u, dt, max_iterations=50, quadrature_points=4,
+             rtol=1e-6, atol=1e-8):
+    """Advance an ODE with an implicit Average Vector Field step.
+
+    The line integral in the AVF method is evaluated with Gauss-Legendre
+    quadrature, and the implicit endpoint is solved by fixed-point iteration.
+    Training differentiates the converged equation with an implicit adjoint
+    solve, so state convergence cannot prematurely stop parameter sensitivities.
+    This supports first-order training gradients, including the energy Hessian
+    needed by PhFNO. Higher-order differentiation of the step is not supported.
+    """
+    dt = _validate_dt(dt, z)
+    # A larger, configurable budget admits moderately contractive steps; this
+    # remains a fixed-point solver and reports failure for noncontractive steps.
+    if (not isinstance(max_iterations, Integral) or isinstance(max_iterations, bool)
+            or max_iterations < 1 or quadrature_points not in (1, 2, 4)):
+        raise ValueError("max_iterations must be positive and quadrature_points must be 1, 2, or 4")
+    if not math.isfinite(rtol) or not math.isfinite(atol) or rtol < 0 or atol < 0:
+        raise ValueError("rtol and atol must be finite and nonnegative")
+    quadrature = {
+        1: ([0.5], [1.0]),
+        2: ([0.2113248654051871, 0.7886751345948129], [0.5, 0.5]),
+        4: ([0.06943184420297371, 0.33000947820757187,
+             0.6699905217924281, 0.9305681557970262],
+            [0.1739274225687269, 0.3260725774312731,
+             0.3260725774312731, 0.1739274225687269]),
+    }
+    nodes, weights = (
+        torch.tensor(values, device=z.device, dtype=z.dtype)
+        for values in quadrature[quadrature_points]
+    )
+    def norm(value):
+        # Measure the entire state per sample, independently of its tensor layout.
+        return torch.linalg.vector_norm(value.flatten(start_dim=1), dim=1)
+
+    def fixed_point(endpoint):
+        # Hold the control fixed and integrate the vector field along the segment.
+        displacement = endpoint - z
+        update = torch.zeros_like(z)
+        for node, weight in zip(nodes, weights):
+            update = update + weight * rhs(z + node * displacement, u)
+        return z + dt * update
+
+    # Solve values without storing every network evaluation. Detaching the
+    # predictor also avoids differentiating a previous rollout step during this solve.
+    with torch.no_grad():
+        next_z = z.detach() + dt * rhs(z.detach(), u)
+        for _ in range(max_iterations):
+            candidate = fixed_point(next_z)
+            residual = norm(candidate - next_z)
+            scale = torch.maximum(norm(z), norm(next_z))
+            if not (torch.isfinite(candidate).all() and torch.isfinite(next_z).all()
+                    and torch.isfinite(residual).all() and torch.isfinite(scale).all()):
+                raise RuntimeError("AVF step did not converge: nonfinite state or residual")
+            if (residual <= atol + rtol * scale).all():
+                # Return the endpoint whose equation residual was just checked,
+                # rather than the candidate whose residual is still unknown.
+                break
+            next_z = candidate
+        else:
+            raise RuntimeError(
+                f"AVF step did not converge after {max_iterations} iterations "
+                f"(residual {residual.max().item():.3e})"
+            )
+    if not torch.is_grad_enabled():
+        return next_z
+
+    endpoint = next_z.detach().requires_grad_(True)
+    mapped = fixed_point(endpoint)
+    if not mapped.requires_grad:
+        return next_z
+
+    def implicit_backward(gradient):
+        # For y=G(y), solve (I-dG/dy)^T lambda=gradient with matrix-free
+        # vector-Jacobian products. This converges sensitivities even at equilibrium.
+        # Autograd may represent an unused output gradient as None.
+        if gradient is None:
+            return None
+        if torch.is_grad_enabled():
+            raise RuntimeError("AVF implicit backward supports first-order gradients only")
+        # Normalize the right-hand side so absolute tolerances do not make the
+        # learned sensitivity depend on arbitrary loss scaling or tiny loss values.
+        gradient_scale = gradient.abs().amax()
+        if gradient_scale == 0:
+            return gradient
+        gradient = gradient / gradient_scale
+        adjoint = gradient
+        for _ in range(max_iterations):
+            product = torch.autograd.grad(
+                mapped, endpoint, adjoint, retain_graph=True, allow_unused=True,
+            )[0]
+            candidate = gradient if product is None else gradient + product
+            residual = norm(candidate - adjoint)
+            scale = torch.maximum(norm(gradient), norm(adjoint))
+            if not (torch.isfinite(candidate).all() and torch.isfinite(residual).all()
+                    and torch.isfinite(scale).all()):
+                raise RuntimeError("AVF backward solve did not converge: nonfinite adjoint")
+            if (residual <= atol + rtol * scale).all():
+                return adjoint * gradient_scale
+            adjoint = candidate
+        raise RuntimeError(
+            f"AVF backward solve did not converge after {max_iterations} iterations "
+            f"(residual {residual.max().item():.3e})"
+        )
+
+    # Hook an internal proxy so Jacobian products do not reenter the hook and
+    # local derivatives with respect to the returned state remain ordinary ones.
+    proxy = mapped.clone()
+    proxy.register_hook(implicit_backward)
+    # Preserve the solved value exactly while differentiating through one map.
+    return next_z + (proxy - proxy.detach())
 
 
 def gonzalez_gradient(energy, z, next_z):

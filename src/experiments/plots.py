@@ -29,10 +29,25 @@ def _band(ax, x, values, label, color, floor=None):
 
 
 def _model_runs(results, name):
+    _validate_runs(results)  # Shared vorticity plots use this helper and need the same seed checks.
     return [run for run in results["runs"] if run["model"] == name]
 
 
+def _validate_runs(results):
+    # Reject partial or duplicated artifacts before averaging: each model needs every configured seed.
+    pairs = [(run["model"], run["seed"]) for run in results["runs"]]
+    if len(pairs) != len(set(pairs)):
+        raise ValueError("Duplicate model/seed results cannot be averaged")
+    seeds = {name: {seed for model, seed in pairs if model == name} for name in COLORS}
+    if set(model for model, _ in pairs) != set(COLORS) or not seeds["PHFNO"] or seeds["PHFNO"] != seeds["FNO"]:
+        raise ValueError("Incomplete comparison: PHFNO and FNO must have matching nonempty seed sets")
+    expected = results.get("config", {}).get("seeds")
+    if expected is not None and seeds["PHFNO"] != set(expected):
+        raise ValueError("Incomplete comparison: results must contain every configured seed for both models")
+
+
 def learning_curves(results):
+    _validate_runs(results)  # Check completeness before allocating a figure or computing seed means.
     fig, axes = _figure(1, 2, width=13, height=4.5)
     for name, color in COLORS.items():
         runs = _model_runs(results, name)
@@ -50,16 +65,18 @@ def learning_curves(results):
         ax.axhline(results["runs"][0]["threshold_nrmse"], color="#333333", linestyle=":", linewidth=1.2, label="Shared target")
         ax.set_ylabel("Validation RMSE / training RMS")
         ax.set_yscale("log")
-    axes[0, 0].set_xlabel("Optimizer steps")
+    # History step counts minibatches; gradient accumulation makes optimizer updates less frequent.
+    axes[0, 0].set_xlabel("Minibatch iterations")
     axes[0, 1].set_xlabel("Optimization time (seconds)")
     axes[0, 0].legend(frameon=False, fontsize=9)
-    axes[0, 0].set_title("Learning per update")
+    axes[0, 0].set_title("Learning per minibatch iteration")
     axes[0, 1].set_title("Learning per second · validation time excluded")
     fig.suptitle("One-step prediction · mean and range across seeds", fontsize=14)
     return fig
 
 
 def rollout_curves(results):
+    _validate_runs(results)  # Incomplete saved runs must not become an unequal-seed comparison.
     families = results["families"]
     fig, axes = _figure(1, len(families), height=4.3)
     for ax, family in zip(axes.flat, families):
@@ -82,6 +99,7 @@ def rollout_curves(results):
 
 
 def physics_curves(results):
+    _validate_runs(results)  # Apply the same completeness requirement to physical diagnostics.
     families = results["families"]
     fig, axes = _figure(2, len(families), height=7)
     for column, family in enumerate(families):
@@ -107,6 +125,7 @@ def physics_curves(results):
 
 
 def equation_curves(results):
+    _validate_runs(results)  # Equation-error bands must compare the same configured seeds.
     families = results["families"]
     fig, axes = _figure(2, len(families), height=7)
     for column, family in enumerate(families):
@@ -130,6 +149,7 @@ def equation_curves(results):
 
 
 def forcing_curves(results):
+    _validate_runs(results)  # Control-response averages also require complete, paired seeds.
     families = results["families"]
     fig, axes = _figure(1, len(families), height=4.3)
     for ax, family in zip(axes.flat, families):
@@ -153,6 +173,7 @@ def _mean_sd(values):
 
 
 def summary_table(results):
+    _validate_runs(results)  # Do not present partial artifacts as completed comparison statistics.
     fig, ax = plt.subplots(figsize=(16, 2.8), layout="constrained")
     ax.set_axis_off()
     rows = []
@@ -172,7 +193,8 @@ def summary_table(results):
             f"{np.mean(hits):.0f}" if hits else "—",
             _mean_sd(final_errors),
         ])
-    columns = ["Model", "Real parameters", "Selected validation\nNRMSE", "Optimization\nseconds", "Target reached", "Mean step to target\n(reached runs)", "Final rollout\nNRMSE"]
+    # threshold_step shares the history's minibatch counter, not the optimizer-update counter.
+    columns = ["Model", "Real parameters", "Selected validation\nNRMSE", "Optimization\nseconds", "Target reached", "Mean minibatch iteration\nto target (reached runs)", "Final rollout\nNRMSE"]
     table = ax.table(cellText=rows, colLabels=columns, cellLoc="center", loc="center")
     table.auto_set_font_size(False)
     table.set_fontsize(10)

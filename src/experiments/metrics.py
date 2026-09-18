@@ -12,7 +12,7 @@ def _power(velocity, rate):
 
 
 @torch.no_grad()
-def evaluate_model(model, data, indices, device="cuda"):
+def evaluate_model(model, data, indices, device="cuda", method=None, solver_options=None):
     indices = list(indices)
     if not indices:
         raise ValueError("indices must contain at least one trajectory")
@@ -33,7 +33,12 @@ def evaluate_model(model, data, indices, device="cuda"):
     was_training = model.training
     model.eval()
     try:
-        prediction = model.rollout(truth[:, 0], controls, times)
+        # Experiment runners pass the training method/settings; None preserves generic adapters.
+        options = {} if method is None else {"method": method}
+        if solver_options is not None:
+            options["solver_options"] = solver_options
+        prediction = model.rollout(truth[:, 0], controls, times, **options)
+        # Compare vector fields at clean reference states, independently of rollout drift.
         left = truth[:, :-1]
         flat_left = left.flatten(0, 1)
         flat_control = controls.flatten(0, 1)

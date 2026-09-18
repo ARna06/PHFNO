@@ -60,6 +60,25 @@ def test_velocity_reference_checks_data_budget_and_seed_coverage(data):
         validate_velocity_reference(reference, {"random": data}, config)
 
 
+@pytest.mark.parametrize("key,replacement", [
+    ("integration_method", "euler"), ("theta_update_start", 0), ("theta_update_interval", 1),
+    ("avf_max_iterations", 80), ("avf_rtol", 1e-5), ("avf_atol", 1e-7),
+    ("avf_quadrature_points", 3), ("loss_definition", "mse"), ("protocol_version", 1),
+])
+def test_velocity_reference_rejects_mismatched_and_missing_protocol(data, key, replacement):
+    # Representation comparisons require the same solver, update schedule and objective.
+    config = small_config()
+    reference = {"config": asdict(config), "families": ["random"],
+                 "dataset_sha256": {"random": data["sha256"]},
+                 "runs": [{"model": name, "seed": 7} for name in ("PHFNO", "FNO")]}
+    reference["config"][key] = replacement
+    with pytest.raises(ValueError, match=key):
+        validate_velocity_reference(reference, {"random": data}, config)
+    del reference["config"][key]
+    with pytest.raises(ValueError, match=f"missing {key}"):
+        validate_velocity_reference(reference, {"random": data}, config)
+
+
 def test_small_vorticity_comparison_saves_raw_and_velocity_diagnostics(data, tmp_path):
     config = small_config()
     reference = run_comparison({"random": data}, config, tmp_path / "velocity")
