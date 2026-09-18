@@ -10,7 +10,7 @@ trajectories. The reusable code lives in `src/phfno/`.
 
 <!-- Audit fix: describe the notebook's shared device choice and actual run configuration. -->
 The [Navier–Stokes comparison notebook](ipynb/compare_phfno_fno.ipynb)
-trains both models on the saved noisy datasets using CUDA when available, or CPU. Run its cells in order
+trains both models on the saved noisy datasets using CUDA. Run its cells in order
 with the **research** kernel to see learning curves, held-out rollouts, velocity
 slices, and checks against the forcing, dissipation, and Navier–Stokes derivatives.
 The [experiment guide](experiments.md) explains the split, metrics, and limitations.
@@ -24,6 +24,207 @@ per model across three seeds, with `tqdm` progress bars and plots displayed inli
 The default accumulation schedule gives 616 Adam updates per run.
 Training and evaluation helpers live in `src/experiments/`; checkpoints and
 numerical results are saved under `results/local_smoke_test_seeds_8_18_28/`.
+
+## Reproduce the notebook results
+
+These steps reproduce the **time 0–1 AVF comparisons**. Run shell commands from
+the repository root. The two comparison notebooks require CUDA and the
+`research` conda environment; the small assembly demonstration also supports CPU.
+
+### 1. Prepare the notebook kernel
+
+Use the existing `research` environment with CUDA-enabled PyTorch:
+
+```bash
+conda activate research
+python -m pip install -e '.[notebook,test]'
+python -m ipykernel install --user --name research --display-name 'Python (research)'
+python -c "import sys, torch; print(sys.executable, torch.__version__); assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
+```
+
+Open the notebooks in VS Code or Jupyter, select **Python (research)**, and run
+cells from the top. The recorded runs used Python 3.11, PyTorch `2.11.0+cu128`,
+and NeuralOperator `2.0.0`. Matching versions and seeds helps reproducibility;
+different hardware/software can still change floating-point results.
+
+### 2. Choose saved results or a fresh run
+
+- **Existing workspace with `.pt` files:** keep the notebook paths unchanged.
+  Re-running the velocity notebook reuses completed matching runs. The vorticity
+  notebook loads a complete matching comparison. Neither retrains completed runs.
+- **Fresh clone or new experiment:** use the fresh directories below. Git stores
+  notebooks, configuration, and JSON summaries, but `.gitignore` excludes dataset
+  and checkpoint `.pt` files. A JSON summary alone cannot run inference.
+
+Use new output directories when changing data or configuration. Cache checks
+compare dataset hashes and experiment settings, and deliberately reject mismatches.
+
+### 3. Generate the comparison datasets
+
+For a fresh run, generate all three flow families into a new directory:
+
+```bash
+PYTHONPATH=src python -m nsdata \
+  --kind all --output-dir datasets/reproduce_avf \
+  --grid-size 24 --trajectories 32 --snapshots 41 --final-time 1 \
+  --viscosity 0.01 --initial-rms 0.2 \
+  --forcing-amplitude 0.1 --forcing-frequency 1 \
+  --cutoff 2 --max-dt 0.005 --noise-level 0.01 \
+  --seed 142 --precision float64 --device cuda --threads 1
+```
+
+This writes `wave.pt`, `taylor_green.pt`, and `random.pt`, each with a JSON
+metadata file. Each velocity tensor has shape `[32, 41, 3, 24, 24, 24]`.
+The saved snapshot interval is **0.025**; `max-dt=0.005` controls the reference
+solver's internal substeps. Forcing is held constant at each saved interval's
+left-endpoint value. Generation uses float64 and stores float32 fields. The
+initial-condition cutoff `2` is separate from the learned models' cutoff `7`.
+
+The CLI refuses to overwrite existing `.pt` **or `.json`** files. Reuse existing
+data when available, or choose another fresh directory. The velocity notebook
+can also generate missing datasets with the same settings, including 1% noise.
+
+For this fresh run, edit the following path assignments before running cells:
+
+| Notebook | Variable or load path | Fresh-run value, relative to `root` |
+|---|---|---|
+| `compare_phfno_fno.ipynb` | `data_directory` | `datasets/reproduce_avf` |
+| `compare_phfno_fno.ipynb` | `output` | `results/reproduce_velocity_avf` |
+| `compare_vorticity.ipynb` | directory passed to `load_datasets` | `datasets/reproduce_avf` |
+| `compare_vorticity.ipynb` | file loaded into `velocity_results` | `results/reproduce_velocity_avf/results.pt` |
+| `compare_vorticity.ipynb` | `output` | `results/reproduce_vorticity_avf` |
+
+For example: `data_directory = root / "datasets" / "reproduce_avf"`.
+
+### 4. Train and evaluate the models
+
+1. Run [compare_phfno_fno.ipynb](ipynb/compare_phfno_fno.ipynb) completely.
+   Its `run_comparison(...)` cell trains the velocity models, restores each
+   validation-selected checkpoint, and evaluates autonomous held-out rollouts.
+2. Run [compare_vorticity.ipynb](ipynb/compare_vorticity.ipynb) completely.
+   It reads the completed velocity comparison, takes curls of the same data for
+   vorticity training, and scores predictions in velocity space while retaining
+   raw-vorticity diagnostics.
+
+Both comparisons use trajectory indices **0–23 for training, 24–27 for validation,
+and 28–31 for testing**, separately for each flow family. They train PHFNO and FNO
+with seeds **8, 18, 28**, for **3,000 minibatch iterations / 616 Adam updates** per
+model and seed. Training uses noisy transitions and a normalized Fourier H1 loss;
+selection uses clean held-out one-step validation error.
+
+Keep the notebook's shared AVF settings: four quadrature points, at most 100
+iterations, `rtol=1e-4`, and `atol=1e-6`. Both CUDA matmul and cuDNN TF32 are
+disabled. These settings are used for training, validation, and evaluation.
+The full runs take substantial GPU time; progress bars report minibatch iterations.
+
+Each comparison output directory contains:
+
+- `PHFNO_{8,18,28}.pt` and `FNO_{8,18,28}.pt`: selected weights and configuration.
+- `results.pt`: histories, predictions, reference fields, metrics, and failure records.
+- `config.json` and `summary.json`: experiment provenance and readable statistics.
+- The vorticity directory also contains `velocity_reference.json`.
+
+To resume an interrupted vorticity comparison that has only partial results,
+run this in place of its cached-results cell, after the setup cells:
+
+```python
+from experiments.vorticity_comparison import run_vorticity_comparison
+
+vorticity_results = run_vorticity_comparison(
+    datasets, config, output, velocity_reference=velocity_results,
+)
+```
+
+Completed model/seed runs are reused. If training completed before evaluation was
+interrupted, checkpoints containing `training_run` also preserve the selected
+weights and training history. An interruption during training itself restarts
+that unfinished model; optimizer state is not saved for mid-training continuation.
+
+### 5. Run inference from a checkpoint without training
+
+In either comparison notebook, run only its setup/data/configuration cells first,
+stopping before the training/results cell. This defines `datasets`, `output`, and
+`device`. With checkpoints already present, execute the following in a new cell:
+
+```python
+from dataclasses import replace
+from experiments.comparison import ComparisonConfig, build_model
+from experiments.metrics import evaluate_model
+from experiments.vorticity_metrics import evaluate_vorticity_model
+
+name, seed, family = "FNO", 8, "random"  # Also supports "PHFNO" and seeds 18/28.
+checkpoint = torch.load(
+    output / f"{name}_{seed}.pt", map_location="cpu", weights_only=True,
+)
+saved_config = replace(
+    ComparisonConfig.from_record(checkpoint["config"]), device=device,
+)
+data = datasets[family]
+model = build_model(checkpoint["model"], saved_config, data["clean"].shape[-3:])
+model.load_state_dict(checkpoint["state_dict"], strict=True)
+model.eval()
+
+evaluator = (
+    evaluate_vorticity_model
+    if checkpoint.get("state_representation", "velocity") == "vorticity"
+    else evaluate_model
+)
+with torch.no_grad():
+    metrics = evaluator(
+        model, data, saved_config.test_indices, device=device,
+        method=saved_config.integration_method,
+        solver_options=saved_config.solver_options,
+        record_failures=True,
+    )
+
+fig, ax = plt.subplots()
+for row, index in enumerate(saved_config.test_indices):
+    ax.plot(metrics["times"], metrics["nrmse_time"][row], label=f"Trajectory {index}")
+for failure in metrics.get("failures", []):
+    ax.axvline(failure["time"], color="black", linestyle=":")
+ax.set(xlabel="Time", ylabel="Velocity RMSE / initial velocity RMS")
+ax.set_xlim(float(metrics["times"][0]), float(metrics["times"][-1]))
+ax.legend()
+plt.show()
+print("AVF rollout failures:", metrics.get("failures", []))
+```
+
+This performs inference and computes diagnostics; it never calls an optimizer.
+Each rollout starts from the clean initial state, feeds predictions into subsequent
+steps, and supplies the saved piecewise-constant controls throughout. The reference
+trajectory is used for scoring, not for resetting predictions. Returned metrics
+are CPU tensors; `prediction` has shape `[4, 41, 3, 24, 24, 24]`. For vorticity
+models it is reconstructed velocity; `vorticity_prediction` retains the raw output.
+
+Always forward the saved integration method and solver settings: public PHFNO and
+FNO rollout defaults differ. Use `torch.no_grad()`, not `torch.inference_mode()`,
+because PHFNO still needs local energy derivatives during inference. Recognized
+solver failures leave missing tails as NaN and are listed in `failures`.
+
+### Other notebooks and interpretation
+
+- [assemble_phfno.ipynb](ipynb/assemble_phfno.ipynb) is an optional interface demo:
+  it generates its own small analytic example and performs three Euler/MSE updates.
+  It does not produce the 3D comparison checkpoints.
+- [dataset.ipynb](ipynb/dataset.ipynb) inspects reference data. For its original
+  small example, generate data with
+  `PYTHONPATH=src python -m nsdata --kind all --output-dir datasets/demo --device cuda`
+  and change its first-cell load path from `root / "datasets"` to
+  `root / "datasets" / "demo"`. Its original resolution labels assume a `16³` grid.
+- [compare_long_rollout.ipynb](ipynb/compare_long_rollout.ipynb) is a separate
+  time-20 evaluation. Before using it for a fresh experiment, point `dataset_dir`
+  and **both** `checkpoint_dirs` at that experiment's matching data and model runs,
+  choose a new output directory, and use the same TF32 settings as above. Its
+  current paths include historical artifacts; they should not be mixed with a
+  new comparison. It generates 801 new reference snapshots, not a stretched time axis.
+
+Read the failure records as well as the error and energy plots. The recorded
+time-1 velocity-trained mean final errors are **0.174 for PHFNO** and **0.099 for
+FNO**, averaged over the three families and seeds. Two vorticity-trained PHFNO
+rollouts fail their AVF solves; their missing values are not omitted from aggregate
+statistics. Low divergence after inverse-curl reconstruction does not establish
+raw-vorticity consistency. These results do not establish PHFNO superiority or
+time-20 accuracy for the newly generated checkpoints.
 
 ## How the pieces fit together
 
@@ -215,7 +416,7 @@ and energy diagnostics. The [dataset guide](datasets/README.md) describes the
 equations, tensor shapes, and generation options.
 
 ```bash
-PYTHONPATH=src python -m nsdata --kind all --output-dir datasets
+PYTHONPATH=src python -m nsdata --kind all --output-dir datasets/demo --device cuda
 ```
 
 By default, this creates four trajectories per kind on a `16³` grid, with 21

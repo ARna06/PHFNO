@@ -151,6 +151,67 @@ def synchronize(device):
         torch.cuda.synchronize(device)
 
 
+def same_protocol(left, right):
+    left = asdict(ComparisonConfig.from_record(left))
+    right = asdict(ComparisonConfig.from_record(right))
+    return all(left[key] == right[key] for key in left if key not in ("device", "progress"))
+
+
+def restore_completed_runs(results, output_dir):
+    """Resume only completed model/seed evaluations from the same experiment."""
+    path = Path(output_dir) / "results.pt"
+    manifest = Path(output_dir) / "config.json"
+    if path.exists():
+        saved = torch.load(path, map_location="cpu", weights_only=True)
+    elif manifest.exists():
+        # Validate provenance before reusing a checkpoint whose evaluation was interrupted.
+        saved = {**json.loads(manifest.read_text()), "runs": []}
+    else:
+        return
+    expected = asdict(ComparisonConfig.from_record(results["config"]))
+    recorded = asdict(ComparisonConfig.from_record(saved["config"]))
+    for key in expected:
+        if key not in ("device", "progress") and expected[key] != recorded[key]:
+            raise ValueError(f"Saved comparison uses different {key}; choose a new output directory")
+    for key in ("families", "dataset_sha256", "state_representation"):
+        if saved.get(key) != results.get(key):
+            raise ValueError(f"Saved comparison uses different {key}")
+    allowed = {(name, seed) for name in ("PHFNO", "FNO") for seed in expected["seeds"]}
+    completed = set()
+    for run in saved["runs"]:
+        identity = (run["model"], run["seed"])
+        if identity not in allowed or identity in completed or set(run["test"]) != set(results["families"]):
+            raise ValueError("Saved comparison contains incomplete or duplicate runs")
+        checkpoint = torch.load(Path(output_dir) / f"{identity[0]}_{identity[1]}.pt",
+                                map_location="cpu", weights_only=True)
+        if (checkpoint["model"], checkpoint["seed"], checkpoint["best_step"]) != (*identity, run["best_step"]):
+            raise ValueError("Saved checkpoint does not match its completed run")
+        if not same_protocol(checkpoint["config"], saved["config"]):
+            raise ValueError("Saved checkpoint uses a different protocol")
+        if checkpoint.get("state_representation", "velocity") != saved.get("state_representation", "velocity"):
+            raise ValueError("Saved checkpoint uses a different state representation")
+        completed.add(identity)
+    results["runs"] = saved["runs"]
+
+
+def restore_training_run(model, path, config, *, name, seed, representation="velocity"):
+    """Keep selected weights and exact training history if evaluation was interrupted."""
+    if not Path(path).exists():
+        return None
+    checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+    if "training_run" not in checkpoint:
+        return None
+    if not same_protocol(checkpoint["config"], asdict(config)):
+        raise ValueError("Interrupted checkpoint uses a different protocol")
+    if ((checkpoint["model"], checkpoint["seed"]) != (name, seed)
+            or checkpoint.get("state_representation", "velocity") != representation
+            or checkpoint["training_run"]["best_step"] != checkpoint["best_step"]):
+        raise ValueError("Interrupted checkpoint identity or selected step does not match")
+    model.load_state_dict(checkpoint["state_dict"], strict=True)
+    model.eval()
+    return checkpoint["training_run"]
+
+
 def predict_next(model, transitions, indices, method="avf", solver_options=None):
     field = transitions["field"][indices]
     # Keep standalone callers compatible while propagating recorded solver settings.
@@ -280,6 +341,15 @@ def train_model(model, training, validation, config, seed, scale, threshold):
             "threshold_optimizer_updates": threshold_optimizer_updates}
 
 
+def finite_summary(value):
+    """JSON null denotes unavailable metrics; never average away failed samples."""
+    if isinstance(value, dict):
+        return {key: finite_summary(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [finite_summary(item) for item in value]
+    return None if isinstance(value, float) and not math.isfinite(value) else value
+
+
 def summarize_run(run):
     summary = {key: value for key, value in run.items() if key != "test"}
     summary["test"] = {}
@@ -293,7 +363,9 @@ def summarize_run(run):
                                        / metrics["reference_power_scale"][:, None]).mean().item(),
             "force_nrmse": metrics["force_nrmse_time"].mean().item(),
         }
-    return summary
+        if metrics.get("failures"):
+            summary["test"][family]["failures"] = metrics["failures"]
+    return finite_summary(summary)
 
 
 def run_comparison(datasets, config, output_dir):
@@ -317,26 +389,34 @@ def run_comparison(datasets, config, output_dir):
                "persistence_validation_nrmse": persistence, "hardware": hardware,
                "torch_version": str(torch.__version__), "runs": [],
                "dataset_sha256": {name: data.get("sha256") for name, data in datasets.items()}}
+    restore_completed_runs(results, output_dir)
+    completed = {(run["model"], run["seed"]) for run in results["runs"]}
     (output_dir / "config.json").write_text(json.dumps({key: value for key, value in results.items()
                                                       if key != "runs"}, indent=2) + "\n")
     for seed_index, seed in enumerate(config.seeds):
         names = ("PHFNO", "FNO") if seed_index % 2 == 0 else ("FNO", "PHFNO")
         for name in names:
+            if (name, seed) in completed:
+                continue
             torch.manual_seed(seed)
             if torch.device(config.device).type == "cuda":
                 torch.cuda.manual_seed_all(seed)
             model = build_model(name, config, grid_shape)
-            run = train_model(model, training, validation, config, seed, scale, persistence * 0.5)
+            checkpoint_path = output_dir / f"{name}_{seed}.pt"
+            run = restore_training_run(model, checkpoint_path, config, name=name, seed=seed)
+            if run is None:
+                run = train_model(model, training, validation, config, seed, scale, persistence * 0.5)
             run.update(model=name, seed=seed, parameter_count=parameter_count(model),
                        evaluation_method=config.integration_method)
             checkpoint = copy_state(model)
             torch.save({"state_dict": checkpoint, "config": asdict(config), "model": name,
                         "seed": seed, "best_step": run["best_step"],
-                        "best_optimizer_updates": run["best_optimizer_updates"]}, output_dir / f"{name}_{seed}.pt")
+                        "best_optimizer_updates": run["best_optimizer_updates"],
+                        "training_run": run}, checkpoint_path)
             # Never let model-specific public defaults change held-out discrete dynamics.
             run["test"] = {family: evaluate_model(model, data, config.test_indices, config.device,
                                                  method=config.integration_method,
-                                                 solver_options=config.solver_options)
+                                                 solver_options=config.solver_options, record_failures=True)
                            for family, data in datasets.items()}
             results["runs"].append(run)
             torch.save(results, output_dir / "results.pt")

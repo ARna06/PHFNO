@@ -12,7 +12,7 @@ def _power(velocity, rate):
 
 
 @torch.no_grad()
-def evaluate_model(model, data, indices, device="cuda", method=None, solver_options=None):
+def evaluate_model(model, data, indices, device="cuda", method=None, solver_options=None, record_failures=False):
     indices = list(indices)
     if not indices:
         raise ValueError("indices must contain at least one trajectory")
@@ -37,7 +37,16 @@ def evaluate_model(model, data, indices, device="cuda", method=None, solver_opti
         options = {} if method is None else {"method": method}
         if solver_options is not None:
             options["solver_options"] = solver_options
-        prediction = model.rollout(truth[:, 0], controls, times, **options)
+        failures = []
+        if record_failures:
+            from .long_rollout import guarded_rollout
+            if hasattr(model, "guarded_rollout"):
+                prediction, failures = model.guarded_rollout(truth[:, 0], controls, times, **options)
+            else:
+                prediction, failures = guarded_rollout(model, truth[:, 0], controls, times, **options)
+            prediction = prediction.to(device=device, dtype=dtype)
+        else:
+            prediction = model.rollout(truth[:, 0], controls, times, **options)
         # Compare vector fields at clean reference states, independently of rollout drift.
         left = truth[:, :-1]
         flat_left = left.flatten(0, 1)
@@ -48,7 +57,8 @@ def evaluate_model(model, data, indices, device="cuda", method=None, solver_opti
         model.train(was_training)
     if prediction.shape != truth.shape:
         raise ValueError("rollout must have the same shape as the reference trajectory")
-    if not all(torch.isfinite(value).all() for value in (prediction, predicted_rhs, unforced_rhs)):
+    if (not all(torch.isfinite(value).all() for value in (predicted_rhs, unforced_rhs))
+            or (not failures and not torch.isfinite(prediction).all())):
         raise FloatingPointError("Model evaluation produced nonfinite predictions")
     spectrum = torch.fft.fftn(flat_left, dim=(-3, -2, -1), norm="forward")
     forcing_spectrum = torch.fft.fftn(
@@ -100,4 +110,8 @@ def evaluate_model(model, data, indices, device="cuda", method=None, solver_opti
         "force_nrmse_time": _rms(predicted_rhs - unforced_rhs - forcing) / force_rms[:, None].clamp_min(1e-12),
         "force_rms": force_rms,
     }
-    return {key: value.detach().cpu() for key, value in result.items()}
+    result = {key: value.detach().cpu() for key, value in result.items()}
+    if failures:
+        result["failures"] = [{**failure, "source_trajectory_index": indices[failure["trajectory_index"]]}
+                              for failure in failures]
+    return result

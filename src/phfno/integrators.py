@@ -50,6 +50,8 @@ def avf_step(rhs, z, u, dt, max_iterations=50, quadrature_points=4,
 
     The line integral in the AVF method is evaluated with Gauss-Legendre
     quadrature, and the implicit endpoint is solved by fixed-point iteration.
+    Use damped updates when ordinary fixed-point iteration is slow or unstable.
+    Acceptance checks the original equation residual, not the damped update.
     Training differentiates the converged equation with an implicit adjoint
     solve, so state convergence cannot prematurely stop parameter sensitivities.
     This supports first-order training gradients, including the energy Hessian
@@ -87,27 +89,35 @@ def avf_step(rhs, z, u, dt, max_iterations=50, quadrature_points=4,
             update = update + weight * rhs(z + node * displacement, u)
         return z + dt * update
 
-    # Solve values without storing every network evaluation. Detaching the
-    # predictor also avoids differentiating a previous rollout step during this solve.
+    def solve(mapping, initial, reference, label):
+        current = initial
+        previous_residual = None
+        damping = 1.0
+        for iteration in range(max_iterations):
+            candidate = mapping(current)
+            residual = norm(candidate - current)
+            scale = torch.maximum(norm(reference), norm(current))
+            if not (torch.isfinite(candidate).all() and torch.isfinite(residual).all()
+                    and torch.isfinite(scale).all()):
+                raise RuntimeError(f"{label} did not converge: nonfinite state or residual")
+            converged = residual <= atol + rtol * scale
+            if converged.all():
+                return current
+            if iteration == 8:
+                damping = 0.5
+            elif iteration > 8 and ((residual > previous_residual) & ~converged).any():
+                damping = max(damping * 0.5, 1 / 64)
+            previous_residual = residual
+            current = current + damping * (candidate - current)
+        raise RuntimeError(
+            f"{label} did not converge after {max_iterations} iterations "
+            f"(residual {residual.max().item():.3e})"
+        )
+
+    # Solve values without retaining every network evaluation in the graph.
     with torch.no_grad():
-        next_z = z.detach() + dt * rhs(z.detach(), u)
-        for _ in range(max_iterations):
-            candidate = fixed_point(next_z)
-            residual = norm(candidate - next_z)
-            scale = torch.maximum(norm(z), norm(next_z))
-            if not (torch.isfinite(candidate).all() and torch.isfinite(next_z).all()
-                    and torch.isfinite(residual).all() and torch.isfinite(scale).all()):
-                raise RuntimeError("AVF step did not converge: nonfinite state or residual")
-            if (residual <= atol + rtol * scale).all():
-                # Return the endpoint whose equation residual was just checked,
-                # rather than the candidate whose residual is still unknown.
-                break
-            next_z = candidate
-        else:
-            raise RuntimeError(
-                f"AVF step did not converge after {max_iterations} iterations "
-                f"(residual {residual.max().item():.3e})"
-            )
+        predictor = z.detach() + dt * rhs(z.detach(), u)
+        next_z = solve(fixed_point, predictor, z.detach(), "AVF step")
     if not torch.is_grad_enabled():
         return next_z
 
@@ -130,24 +140,14 @@ def avf_step(rhs, z, u, dt, max_iterations=50, quadrature_points=4,
         if gradient_scale == 0:
             return gradient
         gradient = gradient / gradient_scale
-        adjoint = gradient
-        for _ in range(max_iterations):
+        def adjoint_map(adjoint):
             product = torch.autograd.grad(
                 mapped, endpoint, adjoint, retain_graph=True, allow_unused=True,
             )[0]
-            candidate = gradient if product is None else gradient + product
-            residual = norm(candidate - adjoint)
-            scale = torch.maximum(norm(gradient), norm(adjoint))
-            if not (torch.isfinite(candidate).all() and torch.isfinite(residual).all()
-                    and torch.isfinite(scale).all()):
-                raise RuntimeError("AVF backward solve did not converge: nonfinite adjoint")
-            if (residual <= atol + rtol * scale).all():
-                return adjoint * gradient_scale
-            adjoint = candidate
-        raise RuntimeError(
-            f"AVF backward solve did not converge after {max_iterations} iterations "
-            f"(residual {residual.max().item():.3e})"
-        )
+            return gradient if product is None else gradient + product
+
+        adjoint = solve(adjoint_map, gradient, gradient, "AVF backward solve")
+        return adjoint * gradient_scale
 
     # Hook an internal proxy so Jacobian products do not reenter the hook and
     # local derivatives with respect to the returned state remain ordinary ones.

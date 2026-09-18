@@ -4,7 +4,10 @@ from pathlib import Path
 
 import torch
 
-from .comparison import ComparisonConfig, build_model, copy_state, parameter_count, prepare_transitions, summarize_run, train_model
+from .comparison import (
+    ComparisonConfig, build_model, copy_state, parameter_count, prepare_transitions,
+    summarize_run, train_model, restore_completed_runs, restore_training_run, finite_summary,
+)
 from .vorticity_metrics import evaluate_vorticity_model
 from .vorticity_operators import PeriodicVorticity
 
@@ -59,7 +62,7 @@ def summarize_vorticity_run(run):
             "vorticity_consistency_nrmse": metrics["vorticity_consistency_nrmse_time"][:, 1:].mean().item(),
             "vorticity_mean_norm": metrics["vorticity_mean_norm"][:, 1:].mean().item(),
         })
-    return summary
+    return finite_summary(summary)
 
 
 def run_vorticity_comparison(datasets, config, output_dir, velocity_reference=None):
@@ -91,27 +94,35 @@ def run_vorticity_comparison(datasets, config, output_dir, velocity_reference=No
                "state_representation": "vorticity", "validation_representation": "vorticity",
                "test_representation": "reconstructed velocity with raw vorticity diagnostics",
                "dataset_sha256": {name: data.get("sha256") for name, data in datasets.items()}}
+    restore_completed_runs(results, output_dir)
+    completed = {(run["model"], run["seed"]) for run in results["runs"]}
     (output_dir / "config.json").write_text(json.dumps({key: value for key, value in results.items()
                                                       if key != "runs"}, indent=2) + "\n")
     for seed_index, seed in enumerate(config.seeds):
         names = ("PHFNO", "FNO") if seed_index % 2 == 0 else ("FNO", "PHFNO")
         for name in names:
+            if (name, seed) in completed:
+                continue
             torch.manual_seed(seed)
             if torch.device(config.device).type == "cuda":
                 torch.cuda.manual_seed_all(seed)
             model = build_model(name, config, grid_shape)
-            run = train_model(model, training, validation, config, seed, scale, persistence * 0.5)
+            checkpoint_path = output_dir / f"{name}_{seed}.pt"
+            run = restore_training_run(model, checkpoint_path, config, name=name, seed=seed,
+                                       representation="vorticity")
+            if run is None:
+                run = train_model(model, training, validation, config, seed, scale, persistence * 0.5)
             run.update(model=name, seed=seed, parameter_count=parameter_count(model),
                        evaluation_method=config.integration_method)
             torch.save({"state_dict": copy_state(model), "config": asdict(config), "model": name,
                         "seed": seed, "best_step": run["best_step"],
                         "best_optimizer_updates": run["best_optimizer_updates"],
-                        "state_representation": "vorticity"},
-                       output_dir / f"{name}_{seed}.pt")
+                        "state_representation": "vorticity", "training_run": run},
+                       checkpoint_path)
             # Match training AVF settings through both the evaluator and velocity adapter.
             run["test"] = {family: evaluate_vorticity_model(model, data, config.test_indices, config.device,
                                                            method=config.integration_method,
-                                                           solver_options=config.solver_options)
+                                                           solver_options=config.solver_options, record_failures=True)
                            for family, data in datasets.items()}
             results["runs"].append(run)
             torch.save(results, output_dir / "results.pt")

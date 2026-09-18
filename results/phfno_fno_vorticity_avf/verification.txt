@@ -1,0 +1,25 @@
+AVF comparison verification
+Environment: research conda environment, NVIDIA H100 NVL CUDA GPUs.
+AVF: 4-point quadrature, 100 iterations, rtol=1e-4, atol=1e-6; TF32 disabled.
+CUDA replay: first two intervals of all held-out families for all 12 checkpoints; recorded failure locations reproduced; finite predictions matched at rtol=1e-5, atol=1e-6.
+
+velocity PHFNO 8 selected 2800 failures 0 of 12 held-out trajectories
+velocity FNO 8 selected 3000 failures 0 of 12 held-out trajectories
+velocity FNO 18 selected 3000 failures 0 of 12 held-out trajectories
+velocity PHFNO 18 selected 3000 failures 0 of 12 held-out trajectories
+velocity PHFNO 28 selected 2900 failures 0 of 12 held-out trajectories
+velocity FNO 28 selected 2900 failures 0 of 12 held-out trajectories
+vorticity PHFNO 8 selected 3000 failures 1 of 12 held-out trajectories
+vorticity FNO 8 selected 3000 failures 0 of 12 held-out trajectories
+vorticity FNO 18 selected 3000 failures 0 of 12 held-out trajectories
+vorticity PHFNO 18 selected 2800 failures 1 of 12 held-out trajectories
+vorticity PHFNO 28 selected 3000 failures 0 of 12 held-out trajectories
+vorticity FNO 28 selected 3000 failures 0 of 12 held-out trajectories
+compare_phfno_fno 13 executed cells, 7 inline plots, no errors
+compare_vorticity 12 executed cells, 8 inline plots, no errors
+Verified all 12 AVF checkpoints, two results.pt files, matched protocols, explicit failure records, and both executed notebooks
+
+Tests at notebook completion: 262 passed, 5 skipped, 1 deselected in 10.86s
+Commit verification (18 September 2026): 268 passed in the research environment with CUDA; one CUDA context initialization warning. No tests excluded. The former long-rollout kernel metadata mismatch is fixed.
+README inference example: executed on CUDA for velocity-trained and vorticity-trained FNO seed 8; both reproduced the saved random-flow predictions at rtol=1e-5, atol=1e-6.
+Notebook dataset generation: explicitly verified 24^3 grid, 32 trajectories, 41 snapshots, seed 142, and noise_level=0.01.

@@ -52,6 +52,8 @@ def representation_rollouts(velocity_results, vorticity_results):
                 values = [run["test"][family]["nrmse_time"] for run in runs]
                 _band(ax, times, values, f"{name} · {representation}", color)
                 ax.lines[-1].set_linestyle(style)
+                if ax.get_legend() is not None:
+                    ax.legend(frameon=False, fontsize=8)
         ax.set_title(FAMILY_NAMES.get(family, family))
         ax.set_xlabel("Time")
         ax.set_ylabel("Velocity rollout RMSE / initial RMS")

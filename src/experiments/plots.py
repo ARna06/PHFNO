@@ -19,6 +19,20 @@ def _figure(rows, columns, width=15, height=4):
 
 def _band(ax, x, values, label, color, floor=None):
     values = np.asarray(values)
+    samples = values.reshape(-1, len(x))
+    failed = ~np.isfinite(samples)
+    if failed.any():
+        # Keep every finite prefix visible when the complete-group mean is unavailable.
+        # These are individual curves, not a changing average of surviving samples.
+        for index, sample in enumerate(samples):
+            ax.plot(x, sample, color=color, alpha=0.18, linewidth=0.8,
+                    label=f"{label}: individual rollouts" if index == 0 else "_nolegend_")
+        first = [np.flatnonzero(row)[0] for row in failed if row.any()]
+        for index in sorted(set(first)):
+            ax.axvline(x[index], color=color, linestyle=":", alpha=0.65)
+        ax.scatter(np.asarray(x)[first], np.full(len(first), 0.96), transform=ax.get_xaxis_transform(),
+                   marker="x", color=color, label=f"{label}: numerical failure")
+    ax.set_xlim(x[0], x[-1])
     values = values.reshape(len(values), -1, len(x)).mean(axis=1)
     mean = values.mean(axis=0)
     low, high = values.min(axis=0), values.max(axis=0)
@@ -26,6 +40,8 @@ def _band(ax, x, values, label, color, floor=None):
         mean, low, high = [np.maximum(value, floor) for value in (mean, low, high)]
     ax.plot(x, mean, label=label, color=color, linewidth=2)
     ax.fill_between(x, low, high, color=color, alpha=0.15, linewidth=0)
+    if any("numerical failure" in name for name in ax.get_legend_handles_labels()[1]):
+        ax.legend(frameon=False, fontsize=8)
 
 
 def _model_runs(results, name):
@@ -169,6 +185,8 @@ def forcing_curves(results):
 
 def _mean_sd(values):
     values = np.asarray(values)
+    if not np.isfinite(values).all():
+        return "Unavailable (failure)"
     return f"{values.mean():.3g} ± {values.std():.2g}"
 
 
@@ -221,13 +239,15 @@ def field_slices(results, family="random", seed=None):
     fields = [truth[:, :, middle]]
     fields.extend(np.asarray(selected[name]["prediction"])[0, -1, 0, :, :, middle] for name in COLORS)
     errors = [np.abs(field - fields[0]) for field in fields[1:]]
-    velocity_limit = max(np.max(np.abs(field)) for field in fields)
-    error_limit = max(np.max(error) for error in errors)
+    velocity_limit = max((np.max(np.abs(field[np.isfinite(field)])) for field in fields if np.isfinite(field).any()), default=1e-12)
+    error_limit = max((np.max(error[np.isfinite(error)]) for error in errors if np.isfinite(error).any()), default=1e-12)
     fig, axes = _figure(1, 5, width=17, height=3.8)
     labels = ("Reference", "PHFNO", "FNO", "PHFNO absolute error", "FNO absolute error")
     for index, (ax, field, title) in enumerate(zip(axes.flat, fields + errors, labels)):
         error = index >= 3
         image = ax.imshow(field.T, origin="lower", extent=(0, 1, 0, 1), cmap="magma" if error else "RdBu_r", vmin=0 if error else -max(velocity_limit, 1e-12), vmax=max(error_limit if error else velocity_limit, 1e-12))
+        if not np.isfinite(field).all():
+            ax.text(0.5, 0.5, "Numerical failure", transform=ax.transAxes, ha="center", va="center")
         ax.set_title(title, fontsize=11)
         ax.set_xlabel("x")
         ax.set_ylabel("y")

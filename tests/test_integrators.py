@@ -157,6 +157,24 @@ def test_avf_reports_nonconvergent_sensitivities_at_equilibrium():
         result.sum().backward()
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("rate", [24.0, 100.0])
+def test_avf_relaxation_solves_stiff_equation_and_implicit_gradient(dtype, rate):
+    initial = torch.tensor([[0.3]], dtype=dtype, requires_grad=True)
+    forcing = torch.tensor([[0.2]], dtype=dtype, requires_grad=True)
+    result = avf_step(lambda state, control: -rate * state + control,
+                      initial, forcing, 0.1, max_iterations=100)
+    ratio = rate * 0.1 / 2
+    expected = ((1 - ratio) * initial + 0.1 * forcing) / (1 + ratio)
+    torch.testing.assert_close(result, expected, rtol=1e-5, atol=1e-7)
+    residual = result - initial - 0.1 * (-rate * (initial + result) / 2 + forcing)
+    tolerance = 1e-8 + 1e-6 * torch.maximum(initial.abs(), result.abs())
+    assert (residual.abs() <= tolerance).all()
+    state_gradient, force_gradient = torch.autograd.grad(result.sum(), (initial, forcing))
+    torch.testing.assert_close(state_gradient, torch.full_like(initial, (1 - ratio) / (1 + ratio)), rtol=1e-5, atol=1e-7)
+    torch.testing.assert_close(force_gradient, torch.full_like(forcing, 0.1 / (1 + ratio)), rtol=1e-5, atol=1e-7)
+
+
 @pytest.mark.parametrize("options", [{"rtol": float("inf")}, {"atol": float("nan")},
                                      {"max_iterations": 1.5}])
 def test_avf_rejects_invalid_solver_settings(options):

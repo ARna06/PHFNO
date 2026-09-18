@@ -94,3 +94,16 @@ def test_vorticity_constraints_keep_raw_data_and_average_seeds(results_pair):
             assert run["test"]["wave"]["vorticity_divergence_rms"].count_nonzero() == 0
     finally:
         plt.close(figure)
+
+
+def test_failure_panel_legend_preserves_representation_styles(results_pair):
+    results_pair[1]["runs"][0]["test"]["random"]["nrmse_time"][0, 1:] = torch.nan
+    figure = representation_rollouts(*results_pair)
+    try:
+        legend = figure.axes[1].get_legend()
+        lines = {line.get_label(): line for line in legend.get_lines()}
+        assert lines["FNO · vorticity"].get_linestyle() == "--"
+        assert lines["FNO · velocity"].get_linestyle() == "-"
+        FigureCanvasAgg(figure).draw()
+    finally:
+        plt.close(figure)

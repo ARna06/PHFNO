@@ -52,9 +52,17 @@ class VelocityFromVorticity(nn.Module):
         self.last_vorticity = vorticity.detach()
         return self.reconstruct(vorticity, initial, controls, times)
 
+    def guarded_rollout(self, initial, controls, times, **options):
+        from .long_rollout import guarded_rollout
+        vorticity, failures = guarded_rollout(
+            self.model, self.operators.curl(initial), controls, times, **options)
+        vorticity = vorticity.to(initial)
+        self.last_vorticity = vorticity
+        return self.reconstruct(vorticity, initial, controls, times), failures
+
 
 @torch.no_grad()
-def evaluate_vorticity_model(model, data, indices, device="cuda", method=None, solver_options=None):
+def evaluate_vorticity_model(model, data, indices, device="cuda", method=None, solver_options=None, record_failures=False):
     parameters = (p for p in model.parameters() if not p.is_complex())
     parameter = next(parameters, None)
     dtype = parameter.dtype if parameter is not None else data["clean"].dtype
@@ -64,7 +72,7 @@ def evaluate_vorticity_model(model, data, indices, device="cuda", method=None, s
     indices = list(indices)
     # Velocity and raw-vorticity metrics must describe the same selected discrete rollout.
     result = evaluate_model(adapter, data, indices, device=device,
-                            method=method, solver_options=solver_options)
+                            method=method, solver_options=solver_options, record_failures=record_failures)
     truth = result["truth"].to(device=device, dtype=dtype)
     prediction = result["prediction"].to(device=device, dtype=dtype)
     vorticity_truth = operators.curl(truth)
@@ -79,7 +87,8 @@ def evaluate_vorticity_model(model, data, indices, device="cuda", method=None, s
         ).reshape_as(vorticity_truth[:, :-1])
     finally:
         model.train(was_training)
-    if not torch.isfinite(vorticity_prediction).all() or not torch.isfinite(predicted_rhs).all():
+    if (not torch.isfinite(predicted_rhs).all()
+            or (not result.get("failures") and not torch.isfinite(vorticity_prediction).all())):
         raise FloatingPointError("Model evaluation produced nonfinite vorticity")
     true_rhs = operators.curl(result["true_rhs"].to(device=device, dtype=dtype))
     divergence = operators.divergence(vorticity_prediction)

@@ -1,5 +1,33 @@
 **Codebase audit — 17 September 2026**
 
+## AVF comparison update — 18 September 2026
+
+The two time-0–1 comparison notebooks have now completed in the research
+environment on NVIDIA H100 NVL GPUs: 25 executed cells, 15 inline plots, and no
+cell errors. Twelve validation-selected checkpoints and two result files were
+generated. Short CUDA replays reproduced their saved predictions and failure
+locations. The full test suite passes: **268 passed**; the long-rollout notebook's
+research kernel metadata mismatch is fixed.
+
+The velocity-trained mean final NRMSE is **0.174 for PHFNO** and **0.099 for FNO**,
+averaged equally over flow families and seeds. Vorticity-trained PHFNO has two
+AVF solver failures on random-flow trajectory 31: seed 8 at time 0.375, and seed
+18 at time 0.025. FNO has no recorded rollout failures in these runs. A solver
+failure does not by itself prove physical instability. Raw-vorticity constraint
+defects also remain; inverse-curl reconstruction's low velocity divergence is
+not evidence that the learned raw vorticity is consistent.
+
+These experiments do not show a general PHFNO advantage or establish time-20
+accuracy for the new checkpoints. The earlier audit and remediation record below
+are retained as history. Current artifacts are under
+`results/local_smoke_test_seeds_8_18_28/` and `results/phfno_fno_vorticity_avf/`.
+The [README reproduction guide](README.md#reproduce-the-notebook-results) explains
+dataset generation, training, checkpoint inference, and the distinction between
+saved results and a fresh run. Binary datasets/checkpoints remain local under
+the repository's existing ignore rules.
+
+## Earlier remediation and original findings
+
 <!-- Remediation update: retain the original audit below as a historical record. -->
 **Remediation completed.** The findings below describe the code before these
 changes; their original line references and test results are historical.
