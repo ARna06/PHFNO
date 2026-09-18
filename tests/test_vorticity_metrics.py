@@ -147,3 +147,20 @@ def test_vorticity_metrics_reject_an_empty_split():
     model = VorticityDecay(rate, operators.curl(data["forcing_basis"]))
     with pytest.raises(ValueError, match="at least one"):
         evaluate_vorticity_model(model, data, [], device="cpu")
+
+
+def test_vorticity_evaluation_forwards_method_and_solver_options_through_adapter(monkeypatch):
+    # Both representation conversion layers must retain the requested integrator.
+    data, operators, rate = wave_data()
+    model = VorticityDecay(rate, operators.curl(data["forcing_basis"]))
+    original = model.rollout
+    received = []
+    options = {"max_iterations": 29, "atol": 1e-9}
+
+    def rollout(initial, controls, times, method, solver_options):
+        received.append((method, solver_options))
+        return original(initial, controls, times)
+
+    monkeypatch.setattr(model, "rollout", rollout)
+    evaluate_vorticity_model(model, data, [0], device="cpu", method="avf", solver_options=options)
+    assert received == [("avf", options)]

@@ -1,5 +1,6 @@
 import inspect
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,8 @@ def test_training_cell_refreshes_a_stale_comparison_function(monkeypatch, tmp_pa
         "datasets": {},
         "config": ComparisonConfig(device="cpu", progress=False),
         "output": tmp_path,
-        "velocity_results": {"config": {"seeds": [999]}},
+        # Keep protocol metadata valid so this import-refresh check still reaches the seed mismatch.
+        "velocity_results": {"config": {**asdict(ComparisonConfig()), "seeds": [999]}},
         "run_vorticity_comparison": stale_comparison,
     }
     for _ in range(2):

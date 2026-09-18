@@ -8,16 +8,22 @@ Start with [the assembly notebook](ipynb/assemble_phfno.ipynb). It builds both
 models, checks their basic properties, and runs a few training steps on synthetic
 trajectories. The reusable code lives in `src/phfno/`.
 
+<!-- Audit fix: describe the notebook's shared device choice and actual run configuration. -->
 The [Navier–Stokes comparison notebook](ipynb/compare_phfno_fno.ipynb)
-trains both models on the saved noisy datasets using CUDA. Run its cells in order
+trains both models on the saved noisy datasets using CUDA when available, or CPU. Run its cells in order
 with the **research** kernel to see learning curves, held-out rollouts, velocity
 slices, and checks against the forcing, dissipation, and Navier–Stokes derivatives.
 The [experiment guide](experiments.md) explains the split, metrics, and limitations.
+The current comparison uses an implicit AVF step for both models, an explicit
+Fourier-space Leray projection in the Navier–Stokes reference solver, and delayed
+parameter updates after step 20. Set `theta_update_interval=10` in
+`ComparisonConfig` for the ten-step variant.
 The notebook generates missing data for the larger run: 32 trajectories per
-flow type on a `24³` grid, with 41 snapshots each. It trains for 3,000 updates
+flow type on a `24³` grid, with 41 snapshots each. It trains for 3,000 minibatch iterations
 per model across three seeds, with `tqdm` progress bars and plots displayed inline.
+The default accumulation schedule gives 616 Adam updates per run.
 Training and evaluation helpers live in `src/experiments/`; checkpoints and
-numerical results are saved under `results/phfno_fno_large/`.
+numerical results are saved under `results/local_smoke_test_seeds_8_18_28/`.
 
 ## How the pieces fit together
 
@@ -34,7 +40,7 @@ flowchart TD
     damping --> dynamics
     factors --> dynamics
     input["External input u"] --> dynamics
-    dynamics --> step["Euler step"]
+    dynamics --> step["AVF step"]
     step --> output["Reconstruct the next state field"]
 ```
 
@@ -118,19 +124,27 @@ also limits `J` to rank at most two, which may restrict what the model can learn
 
 ### Take time steps and train
 
-Time evolution uses a simple Euler step:
+<!-- Audit fix: AVF integrates along the unknown endpoint segment; the old equation was Euler. -->
+The comparison explicitly uses the same implicit AVF step for training, validation,
+and held-out evaluation:
 
 $$
-z_{j+1} = z_j + \Delta t_j\,f_\theta(z_j,u_j).
+z_{j+1} = z_j + \Delta t_j\int_0^1
+f_\theta((1-\xi)z_j+\xi z_{j+1},u_j)\,d\xi.
 $$
 
 Autodiff remains active through the energy gradient during training. A prediction
 loss can therefore update the energy network, the damping network, and the FNO,
 including across several rollout steps.
 
-Euler is easy to inspect, but it does not guarantee decreasing energy for a finite
-time step. Autodiff is the only implemented energy-gradient method; a discrete
-gradient method can be added later if needed.
+<!-- Audit fix: distinguish public defaults and the continuous identity from a discrete guarantee. -->
+Public `PHFNO.step` and `rollout` calls default to the implemented Gonzalez
+discrete-gradient method; `FNOBaseline` defaults to Euler. Pass `method="avf"`
+to select AVF explicitly. The AVF line integral uses numerical quadrature, and
+PhFNO's structure matrices depend on the intermediate state. Therefore AVF does
+not guarantee exact learned-energy preservation, dissipation, or passivity for
+this architecture. The assembly notebook uses Euler and MSE as a small interface
+demonstration; the comparison trains with a normalized Fourier H1 loss.
 
 ## The FNO comparison model
 
@@ -141,7 +155,7 @@ retained Fourier space. Both models expose the same interface:
 | Call | Result |
 |---|---|
 | `model(field, control)` | State derivative on the input grid |
-| `model.step(field, control, dt)` | Next state after one Euler step |
+| `model.step(field, control, dt)` | Next state after the selected integration step |
 | `model.rollout(initial, controls, times)` | Full predicted trajectory, including the initial state |
 
 Fields have shape `[batch, channels, *grid]`. A control has shape
@@ -160,7 +174,7 @@ notebook measures both models on the same data and reports their different costs
 |---|---|
 | [fourier.py](src/phfno/fourier.py) | Fourier coordinates and field reconstruction |
 | [model.py](src/phfno/model.py) | Learned energy, damping, factors, and structured dynamics |
-| [integrators.py](src/phfno/integrators.py) | Autodiff energy gradient and Euler step |
+| [integrators.py](src/phfno/integrators.py) | Autodiff energy gradient, AVF, Euler, and Gonzalez steps |
 | [baseline.py](src/phfno/baseline.py) | FNO comparison model |
 | [assembly notebook](ipynb/assemble_phfno.ipynb) | Worked example and short training loop |
 | [tests/](tests/) | Small checks of the mathematics and gradient flow |

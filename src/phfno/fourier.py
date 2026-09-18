@@ -24,6 +24,7 @@ class RealFourierCoordinates(nn.Module):
         self.spatial_dim = len(self.cutoff)
         self.modes_per_channel = prod(2 * n + 1 for n in self.cutoff)
         self.coordinate_dim = self.channels * self.modes_per_channel
+        # Real fields have conjugate Fourier pairs; store one representative per pair.
         representatives = [
             k
             for k in product(*(range(-n, n + 1) for n in self.cutoff))
@@ -57,6 +58,8 @@ class RealFourierCoordinates(nn.Module):
                 f"{self.spatial_dim} spatial dimensions]"
             )
         self._grid_shape(field.shape[2:])
+        # Forward normalization and sqrt(2) packing make the coordinate squared
+        # norm equal the spatial mean of the retained field's channel-summed energy.
         spectrum = torch.fft.fftn(field, dim=tuple(range(2, field.ndim)), norm="forward")
         zero = spectrum[(slice(None), slice(None), *((0,) * self.spatial_dim))].real
         modes = self.modes.to(device=field.device)
@@ -82,6 +85,7 @@ class RealFourierCoordinates(nn.Module):
         coefficients = torch.complex(pairs[..., 0], pairs[..., 1]) / sqrt(2)
         modes = self.modes.to(device=coordinates.device)
         spectrum[(slice(None), slice(None), *modes.unbind(dim=1))] = coefficients
+        # Restore the conjugate partners before reconstructing a real periodic field.
         spectrum[(slice(None), slice(None), *(-modes).unbind(dim=1))] = coefficients.conj()
         return torch.fft.ifftn(
             spectrum, dim=tuple(range(2, spectrum.ndim)), norm="forward"

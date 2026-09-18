@@ -50,7 +50,8 @@ def results():
                 "train_seconds": history[-1]["optimization_seconds"],
                 "test": {family: metrics.copy() for family in families},
             })
-    return {"families": families, "runs": runs, "persistence_validation_nrmse": 0.3}
+    # Declare expected seeds so partial artifacts can be distinguished from completed comparisons.
+    return {"families": families, "runs": runs, "persistence_validation_nrmse": 0.3, "config": {"seeds": [0, 1]}}
 
 
 @pytest.mark.parametrize(
@@ -75,6 +76,9 @@ def test_learning_curves_use_shared_time_ranges_and_seed_means(results):
         np.testing.assert_allclose(step_lines["PHFNO"].get_ydata(), [0.65, 0.45, 0.25])
         np.testing.assert_allclose(time_lines["PHFNO"].get_xdata()[[0, -1]], [0.2, 2.0])
         np.testing.assert_allclose(time_lines["FNO"].get_xdata()[[0, -1]], [0.1, 0.8])
+        # Accumulated gradients mean recorded steps are minibatches, not optimizer updates.
+        assert figure.axes[0].get_xlabel() == "Minibatch iterations"
+        assert figure.axes[0].get_title() == "Learning per minibatch iteration"
     finally:
         plt.close(figure)
 
@@ -123,5 +127,21 @@ def test_summary_counts_only_runs_that_reached_the_target(results):
         assert table[1, 4].get_text().get_text() == "1 / 2"
         assert table[1, 5].get_text().get_text() == "20"
         assert table[2, 4].get_text().get_text() == "1 / 2"
+        # The target-reaching counter has the same minibatch interpretation as learning curves.
+        assert "minibatch iteration" in table[0, 5].get_text().get_text()
     finally:
         plt.close(figure)
+
+
+@pytest.mark.parametrize("plot", [learning_curves, rollout_curves, physics_curves, equation_curves, forcing_curves, summary_table])
+@pytest.mark.parametrize("defect", ["unmatched", "partial", "duplicate"])
+def test_comparison_plots_reject_incomplete_or_duplicate_seed_results(results, plot, defect):
+    # A visually complete plot must not silently average different seeds or unfinished runs.
+    if defect == "unmatched":
+        results["runs"].pop()
+    elif defect == "partial":
+        results["runs"] = [run for run in results["runs"] if run["seed"] == 0]
+    else:
+        results["runs"].append(results["runs"][0])
+    with pytest.raises(ValueError, match="Incomplete comparison|Duplicate model/seed"):
+        plot(results)

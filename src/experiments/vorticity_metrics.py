@@ -31,6 +31,7 @@ class VelocityFromVorticity(nn.Module):
     def reconstruct(self, vorticity, initial_velocity, controls, times):
         if vorticity.shape[:2] != (initial_velocity.shape[0], times.numel()):
             raise ValueError("vorticity must match the batch size and time grid")
+        # Curl loses mean velocity; evolve that component from the mean force separately.
         mean = initial_velocity.mean(dim=(-3, -2, -1)).unsqueeze(1)
         if controls is None:
             mean = mean.expand(-1, times.numel(), -1)
@@ -42,14 +43,18 @@ class VelocityFromVorticity(nn.Module):
             mean = mean + offsets
         return self.operators.velocity(vorticity, mean=mean)
 
-    def rollout(self, initial, controls, times):
-        vorticity = self.model.rollout(self.operators.curl(initial), controls, times)
+    def rollout(self, initial, controls, times, method=None, solver_options=None):
+        # Forward the selected integrator through the representation adapter unchanged.
+        options = {} if method is None else {"method": method}
+        if solver_options is not None:
+            options["solver_options"] = solver_options
+        vorticity = self.model.rollout(self.operators.curl(initial), controls, times, **options)
         self.last_vorticity = vorticity.detach()
         return self.reconstruct(vorticity, initial, controls, times)
 
 
 @torch.no_grad()
-def evaluate_vorticity_model(model, data, indices, device="cuda"):
+def evaluate_vorticity_model(model, data, indices, device="cuda", method=None, solver_options=None):
     parameters = (p for p in model.parameters() if not p.is_complex())
     parameter = next(parameters, None)
     dtype = parameter.dtype if parameter is not None else data["clean"].dtype
@@ -57,7 +62,9 @@ def evaluate_vorticity_model(model, data, indices, device="cuda"):
     forcing_basis = data["forcing_basis"].to(device=device, dtype=dtype)
     adapter = VelocityFromVorticity(model, operators, forcing_basis)
     indices = list(indices)
-    result = evaluate_model(adapter, data, indices, device=device)
+    # Velocity and raw-vorticity metrics must describe the same selected discrete rollout.
+    result = evaluate_model(adapter, data, indices, device=device,
+                            method=method, solver_options=solver_options)
     truth = result["truth"].to(device=device, dtype=dtype)
     prediction = result["prediction"].to(device=device, dtype=dtype)
     vorticity_truth = operators.curl(truth)

@@ -6,7 +6,7 @@ from neuralop.models import FNO
 from torch import Tensor, nn
 
 from .fourier import RealFourierCoordinates
-from .integrators import energy_gradient, euler_step, gonzalez_step
+from .integrators import avf_step, energy_gradient, euler_step, gonzalez_step
 
 
 def make_fno(cutoff, in_channels, out_channels, hidden_channels, n_layers):
@@ -30,17 +30,20 @@ class PHStructure:
     B: Tensor
 
     def apply_j(self, effort: Tensor) -> Tensor:
+        # This rank-two skew action exchanges energy without forming a dense matrix.
         be = (self.b * effort).sum(dim=-1, keepdim=True)
         ae = (self.a * effort).sum(dim=-1, keepdim=True)
         return 0.5 * (self.a * be - self.b * ae)
 
     def apply_r(self, effort: Tensor) -> Tensor:
+        # Squaring the damping makes its contribution to continuous power nonpositive.
         return self.d.square().unsqueeze(-1) * effort
 
     def apply_b(self, control: Tensor) -> Tensor:
         return torch.bmm(self.B, control.unsqueeze(-1)).squeeze(-1)
 
     def output(self, effort: Tensor) -> Tensor:
+        # The conjugate port output makes supplied power equal to control dot output.
         return torch.bmm(self.B.transpose(1, 2), effort.unsqueeze(-1)).squeeze(-1)
 
 
@@ -78,6 +81,7 @@ class PHFNO(nn.Module):
             hidden_channels, n_layers,
         )
         dim = self.coordinates.coordinate_dim
+        # An additive energy bias cannot affect its gradient, so it is omitted.
         self.energy_net = _scalar_mlp(dim, mlp_width, output_bias=False)
         self.damping_net = _scalar_mlp(dim, mlp_width)
 
@@ -88,6 +92,8 @@ class PHFNO(nn.Module):
         return energy_gradient(self.energy, z, create_graph=create_graph)
 
     def structure(self, z: Tensor) -> PHStructure:
+        # A fixed internal grid keeps the coordinate dynamics independent of the
+        # external observation grid. The FNO produces a, b, and one B column per input.
         field = self.coordinates.decode(z, self.parameter_grid)
         raw = self.factor_net(field)
         groups = 2 + self.control_channels
@@ -113,31 +119,44 @@ class PHFNO(nn.Module):
         control = self._control(z, control)
         e = self.effort(z)
         factors = self.structure(z)
+        # Combine conservative exchange, dissipation, and externally supplied input.
         return factors.apply_j(e) - factors.apply_r(e) + factors.apply_b(control)
 
     def forward(self, field: Tensor, control: Tensor | None = None) -> Tensor:
         z = self.coordinates.encode(field)
         return self.coordinates.decode(self.rhs_coordinates(z, control), field.shape[2:])
 
-    def step(self, field: Tensor, control: Tensor | None, dt, method="gonzalez") -> Tensor:
-        if method not in ("gonzalez", "euler"):
-            raise ValueError("method must be 'gonzalez' or 'euler'")
+    def step(self, field: Tensor, control: Tensor | None, dt, method="gonzalez",
+             solver_options=None) -> Tensor:
+        if method not in ("avf", "gonzalez", "euler"):
+            raise ValueError("method must be 'avf', 'gonzalez', or 'euler'")
+        # Expose solver controls without changing the historical public default.
+        options = {} if solver_options is None else dict(solver_options)
+        if method == "euler" and options:
+            raise ValueError("Euler does not accept implicit solver options")
+        # Encode -> evolve retained Fourier coordinates -> reconstruct the field.
         z = self.coordinates.encode(field)
         control = self._control(z, control)
-        if method == "gonzalez":
-            next_z = gonzalez_step(self.energy, self.structure(z), z, control, dt)
+        if method == "avf":
+            # Generic AVF samples state-dependent factors along the segment; it
+            # does not guarantee a discrete energy law for these learned factors.
+            next_z = avf_step(self.rhs_coordinates, z, control, dt, **options)
+        elif method == "gonzalez":
+            # Gonzalez instead freezes the structure and uses a discrete energy gradient.
+            next_z = gonzalez_step(self.energy, self.structure(z), z, control, dt, **options)
         else:
             next_z = euler_step(self.rhs_coordinates, z, control, dt)
         return self.coordinates.decode(next_z, field.shape[2:])
 
     def rollout(self, initial: Tensor, controls: Tensor | None, times: Tensor,
-                method="gonzalez") -> Tensor:
+                method="gonzalez", solver_options=None) -> Tensor:
+        # Forward the same integration settings through every autonomous step.
         return _rollout(
-            self, self.coordinates.project(initial), controls, times, method
+            self, self.coordinates.project(initial), controls, times, method, solver_options
         )
 
 
-def _rollout(model, initial, controls, times, method):
+def _rollout(model, initial, controls, times, method, solver_options=None):
     times = torch.as_tensor(times, dtype=initial.dtype, device=initial.device)
     if times.ndim != 1 or times.numel() < 1 or not torch.isfinite(times).all():
         raise ValueError("times must be a nonempty finite one-dimensional array")
@@ -150,5 +169,7 @@ def _rollout(model, initial, controls, times, method):
         raise ValueError("controls must have shape [batch, len(times)-1, control_channels]")
     states = [initial]
     for index, dt in enumerate(times[1:] - times[:-1]):
-        states.append(model.step(states[-1], controls[:, index], dt, method=method))
+        # Feed each prediction back as input, holding its control over this interval.
+        states.append(model.step(states[-1], controls[:, index], dt, method=method,
+                                 solver_options=solver_options))
     return torch.stack(states, dim=1)

@@ -47,7 +47,8 @@ class PeriodicNavierStokes:
         if field.device != self.device:
             raise ValueError(f"field device must be {self.device}")
 
-    def _project_spectrum(self, spectrum: torch.Tensor, dealias: bool = True):
+    def leray_project(self, spectrum: torch.Tensor, dealias: bool = True):
+        """Apply the Fourier-space Leray projector and optional dealiasing."""
         parallel = (self.k * spectrum).sum(dim=1, keepdim=True) * self.inverse_k2
         mask = self.dealias_mask if dealias else self.nyquist_mask
         return (spectrum - self.k * parallel) * mask
@@ -55,7 +56,7 @@ class PeriodicNavierStokes:
     def project(self, field: torch.Tensor, dealias: bool = True):
         self._validate_field(field)
         spectrum = torch.fft.fftn(field, dim=(-3, -2, -1), norm="forward")
-        spectrum = self._project_spectrum(spectrum, dealias=dealias)
+        spectrum = self.leray_project(spectrum, dealias=dealias)
         return torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real
 
     def divergence(self, field: torch.Tensor):
@@ -76,16 +77,16 @@ class PeriodicNavierStokes:
             self._validate_field(forcing_spectrum, spectral=True)
             if forcing_spectrum.shape != spectrum.shape:
                 raise ValueError("forcing_spectrum must have the same shape as spectrum")
-        spectrum = self._project_spectrum(spectrum)
+        spectrum = self.leray_project(spectrum)
         velocity = torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real
         curl_spectrum = torch.linalg.cross(self.ik, spectrum, dim=1)
         vorticity = torch.fft.ifftn(curl_spectrum, dim=(-3, -2, -1), norm="forward").real
         nonlinear = torch.linalg.cross(velocity, vorticity, dim=1)
         nonlinear = torch.fft.fftn(nonlinear, dim=(-3, -2, -1), norm="forward")
-        derivative = self._project_spectrum(nonlinear) - self.viscosity * self.k2 * spectrum
+        derivative = self.leray_project(nonlinear) - self.viscosity * self.k2 * spectrum
         derivative[:, :, 0, 0, 0] = 0
         if forcing_spectrum is not None:
-            derivative = derivative + self._project_spectrum(forcing_spectrum)
+            derivative = derivative + self.leray_project(forcing_spectrum)
         return derivative
 
     def _step(self, spectrum: torch.Tensor, dt: float, forcing_spectrum=None):
@@ -93,7 +94,7 @@ class PeriodicNavierStokes:
         k2 = self.rhs(spectrum + 0.5 * dt * k1, forcing_spectrum)
         k3 = self.rhs(spectrum + 0.5 * dt * k2, forcing_spectrum)
         k4 = self.rhs(spectrum + dt * k3, forcing_spectrum)
-        return self._project_spectrum(spectrum + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
+        return self.leray_project(spectrum + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
 
     @torch.no_grad()
     def solve(
@@ -123,7 +124,7 @@ class PeriodicNavierStokes:
             if not torch.isfinite(forcing).all():
                 raise ValueError("forcing must be finite")
         spectrum = torch.fft.fftn(initial, dim=(-3, -2, -1), norm="forward")
-        spectrum = self._project_spectrum(spectrum)
+        spectrum = self.leray_project(spectrum)
         velocity = torch.fft.ifftn(spectrum, dim=(-3, -2, -1), norm="forward").real
         snapshots = [velocity]
         current_time = 0.0
@@ -134,7 +135,7 @@ class PeriodicNavierStokes:
                 forcing_spectrum = torch.fft.fftn(
                     forcing[:, interval], dim=(-3, -2, -1), norm="forward"
                 )
-                forcing_spectrum = self._project_spectrum(forcing_spectrum)
+                forcing_spectrum = self.leray_project(forcing_spectrum)
                 acceleration = torch.fft.ifftn(
                     forcing_spectrum, dim=(-3, -2, -1), norm="forward"
                 ).real.abs().sum(dim=1).amax().item()

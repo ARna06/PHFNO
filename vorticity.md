@@ -63,7 +63,14 @@ The stretching term is absent in two dimensions. The forcing contribution belong
 
 The physical reference operators above are used for verification. The learned models retain their existing Hamiltonian, skew factors, damping, and control interfaces. In particular, changing the input to vorticity does not force the learned Hamiltonian to equal kinetic energy or make the learned dissipation equal the physical operator.
 
-Training applies the existing Euler step to noisy vorticity and fits the next noisy vorticity observation. The loss uses one RMS scale computed from the training vorticity. Validation uses noisy current states and clean next vorticity, and selects the best checkpoint independently for each model and seed.
+<!-- Audit fix: use the same explicit AVF protocol and Fourier H1 objective as velocity training. -->
+Training applies the AVF step to noisy vorticity and fits the next noisy vorticity
+observation using the Fourier H1 loss divided by the squared training-vorticity
+RMS. Validation uses ordinary RMSE against clean next vorticity, divided by the
+same RMS, and selects the best checkpoint independently for each model and seed.
+Test rollouts retain the training integration method and solver settings.
+PhFNO's state-dependent AVF structure does not guarantee exact discrete energy
+conservation or passivity.
 
 This changes the error being minimized: curl gives higher frequencies greater weight. Native vorticity and velocity validation losses therefore should not be compared numerically. The four-model comparison uses held-out velocity errors after reconstruction. The learning curves within the vorticity experiment compare PHFNO and FNO using the same vorticity loss.
 
@@ -94,13 +101,20 @@ $$
 {\operatorname{RMS}(\omega_0)}.
 $$
 
-The velocity diagnostics use the same test trajectories and normalization as the existing experiment: trajectory error, physical kinetic energy, true Navier–Stokes derivative error, forcing response, and power balance. Dataset hashes and training settings are checked before comparing the two representations.
+<!-- Audit fix: references must establish the full protocol instead of silently acquiring new defaults. -->
+The velocity diagnostics use the same test trajectories and normalization as the existing experiment: trajectory error, physical kinetic energy, true Navier–Stokes derivative error, forcing response, and power balance. Dataset hashes, loss definition, integration settings, and the accumulation schedule are checked before comparing the two representations. References missing protocol information are rejected; rerun the velocity comparison first. The notebook reads the current velocity run from `results/local_smoke_test_seeds_8_18_28/`.
 
 Plots appear inside the notebook without footer captions. Each training run uses an in-place tqdm widget. Shaded bands average test trajectories within each seed first, then show the minimum and maximum across seeds.
 
 ## Results of the comparison
 
-The H100 run completed 3,000 updates for each model and all three seeds. The following errors use reconstructed velocity, normalized by each trajectory's initial velocity RMS and averaged over the held-out trajectories, flow types, and seeds:
+<!-- Audit fix: identify these as legacy measurements, separate from the repaired AVF protocol. -->
+The historical H100 report described 3,000 recorded training iterations for each
+model and all three seeds. These saved records predate the audit fixes and do
+not establish a matched current AVF protocol. The current default schedule
+would make 616 Adam updates in 3,000 minibatch iterations. The following
+historical errors use reconstructed velocity, normalized by each trajectory's
+initial velocity RMS and averaged over held-out trajectories, flow types, and seeds:
 
 | Model | Fitted state | Final velocity NRMSE |
 |---|---|---:|

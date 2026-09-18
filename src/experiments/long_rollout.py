@@ -17,8 +17,12 @@ from .vorticity_operators import PeriodicVorticity
 
 
 def file_sha256(path):
+    # Stream hashes in bounded chunks; hashlib.file_digest requires Python 3.11.
+    digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 @torch.no_grad()
@@ -67,8 +71,8 @@ def extend_reference(data, indices, final_time=20.0, dt=0.025, device="cuda"):
 
 
 @torch.no_grad()
-def guarded_rollout(model, initial, controls, times):
-    """Native autonomous steps; keep finite histories and explicit per-item failures."""
+def guarded_rollout(model, initial, controls, times, method=None, solver_options=None):
+    """Autonomous steps with explicit solver selection and per-item failures."""
     times = torch.as_tensor(times, dtype=torch.float64, device="cpu")
     if times.ndim != 1 or times.numel() < 2 or not torch.isfinite(times).all() or not (times.diff() > 0).all():
         raise ValueError("times must be finite and strictly increasing")
@@ -84,6 +88,14 @@ def guarded_rollout(model, initial, controls, times):
     failures = []
     was_training = model.training
     model.eval()
+    # Experiments supply the saved method/options; omitted values retain the public model defaults.
+    step_options = {}
+    if method is not None:
+        step_options["method"] = method
+    if solver_options is not None:
+        step_options["solver_options"] = solver_options
+    # Both implicit solvers can fail; unrelated implementation errors must still propagate.
+    convergence_errors = ("AVF step did not converge", "Gonzalez step did not converge")
     try:
         for step, dt in enumerate(times.diff(), start=1):
             if not len(active):
@@ -91,19 +103,19 @@ def guarded_rollout(model, initial, controls, times):
             control = controls[active, step - 1]
             reasons = {}
             try:
-                candidate = model.step(state, control, dt.item())
+                candidate = model.step(state, control, dt.item(), **step_options)
             except RuntimeError as error:
-                if not str(error).startswith("Gonzalez step did not converge"):
+                if not str(error).startswith(convergence_errors):
                     raise
                 # One divergent item must not terminate the other trajectories.
                 candidate = torch.full_like(state, torch.nan)
                 for local in range(len(active)):
                     try:
                         candidate[local:local + 1] = model.step(
-                            state[local:local + 1], control[local:local + 1], dt.item()
+                            state[local:local + 1], control[local:local + 1], dt.item(), **step_options
                         )
                     except RuntimeError as item_error:
-                        if not str(item_error).startswith("Gonzalez step did not converge"):
+                        if not str(item_error).startswith(convergence_errors):
                             raise
                         reasons[local] = str(item_error)
             finite = torch.isfinite(candidate).flatten(1).all(dim=1)
@@ -120,7 +132,7 @@ def guarded_rollout(model, initial, controls, times):
 
 
 @torch.no_grad()
-def evaluate_long_model(model, reference, representation, device="cuda"):
+def evaluate_long_model(model, reference, representation, device="cuda", method=None, solver_options=None):
     """Velocity-space diagnostics plus unprojected vorticity checks in small batches."""
     if representation not in ("velocity", "vorticity"):
         raise ValueError("representation must be velocity or vorticity")
@@ -131,7 +143,8 @@ def evaluate_long_model(model, reference, representation, device="cuda"):
     times = reference["times"].double()
     operators = PeriodicVorticity(initial.shape[-1], device=device, dtype=dtype)
     state = operators.curl(initial) if representation == "vorticity" else initial
-    raw, failures = guarded_rollout(model, state, controls, times)
+    # Preserve the checkpoint's integrator through the representation-independent stepping path.
+    raw, failures = guarded_rollout(model, state, controls, times, method=method, solver_options=solver_options)
     prediction = torch.empty_like(raw) if representation == "vorticity" else raw
     # Reuse reconstruction, including the initial mean and prescribed mean-force integral.
     adapter = VelocityFromVorticity(model, operators, reference["forcing_basis"].to(device=device, dtype=dtype))
@@ -180,6 +193,9 @@ def evaluate_long_model(model, reference, representation, device="cuda"):
         failure["trajectory_index"] = reference["source_indices"][failure["trajectory_index"]]
     result.update(times=times, initial_rms=initial_rms[:, 0], prediction=prediction, failures=failures,
                   trajectory_indices=reference["source_indices"])
+    # Persist the actual explicit solver alongside metrics so evaluation provenance survives extraction.
+    if method is not None:
+        result.update(integration_method=method, solver_options=dict(solver_options or {}))
     if representation == "vorticity":
         result["vorticity_prediction"] = raw
     return result
@@ -196,7 +212,8 @@ def load_selected_checkpoint(path, representation, summary, device="cuda"):
     best = min(run["history"], key=lambda row: row["validation_nrmse"])
     if checkpoint["best_step"] != run["best_step"] or checkpoint["best_step"] != best["step"]:
         raise ValueError(f"Checkpoint is not the validation-selected step: {path}")
-    config = replace(ComparisonConfig(**checkpoint["config"]), device=device)
+    # Legacy omissions cannot be filled with today's AVF defaults: the saved protocol must be explicit.
+    config = replace(ComparisonConfig.from_record(checkpoint["config"]), device=device)
     grid_size = summary["evaluation_grid_size"]
     model = build_model(checkpoint["model"], config, (grid_size,) * 3)
     model.load_state_dict(checkpoint["state_dict"], strict=True)
@@ -204,6 +221,8 @@ def load_selected_checkpoint(path, representation, summary, device="cuda"):
     return model, {"model": checkpoint["model"], "seed": checkpoint["seed"],
                    "representation": representation, "best_step": checkpoint["best_step"],
                    "best_validation_nrmse": best["validation_nrmse"],
+                   # Keep the selected method/options available to the long-rollout caller.
+                   "integration_method": config.integration_method, "solver_options": config.solver_options,
                    "checkpoint_sha256": file_sha256(path)}
 
 
@@ -247,6 +266,8 @@ def run_long_comparison(dataset_dir, checkpoint_dirs, output_dir, device="cuda")
         if output_dir == source or source in output_dir.parents or output_dir in source.parents:
             raise ValueError("Evaluation output must be separate from source directories")
     summaries = {key: json.loads((path / "summary.json").read_text()) for key, path in checkpoint_dirs.items()}
+    # Validate saved protocols before creating outputs; missing legacy metadata is ambiguous.
+    configs = {key: ComparisonConfig.from_record(summary["config"]) for key, summary in summaries.items()}
     baseline = summaries["velocity"]
     families, indices = baseline["families"], baseline["config"]["test_indices"]
     hashes = {family: file_sha256(dataset_dir / f"{family}.pt") for family in families}
@@ -254,25 +275,30 @@ def run_long_comparison(dataset_dir, checkpoint_dirs, output_dir, device="cuda")
     for representation, summary in summaries.items():
         if summary["families"] != families or summary["dataset_sha256"] != hashes:
             raise ValueError("Both saved comparisons must use these exact datasets and families")
-        for key in ("seeds", "train_indices", "validation_indices", "test_indices"):
+        # Representations must share the complete training protocol, including solver and accumulation settings.
+        for key in (key for key in baseline["config"] if key not in ("device", "progress")):
             if summary["config"][key] != baseline["config"][key]:
-                raise ValueError(f"Saved comparison split/seed mismatch: {key}")
+                raise ValueError(f"Saved comparison protocol mismatch: {key}")
         for name in ("PHFNO", "FNO"):
             for seed in summary["config"]["seeds"]:
                 path = checkpoint_dirs[representation] / f"{name}_{seed}.pt"
                 checkpoints[f"{representation}/{name}_{seed}"] = file_sha256(path)
     manifest = {
-        "format_version": 1, "final_time": 20.0, "dt": 0.025, "n_snapshots": 801,
+        # Version 2 invalidates cached rollouts that silently used model-default integrators.
+        "format_version": 2, "final_time": 20.0, "dt": 0.025, "n_snapshots": 801,
         "dataset_sha256": hashes, "checkpoint_sha256": checkpoints,
         "summary_sha256": {key: file_sha256(path / "summary.json") for key, path in checkpoint_dirs.items()},
         "test_indices": indices, "seeds": baseline["config"]["seeds"], "families": families,
         "device": str(device), "hardware": torch.cuda.get_device_name(device),
         "torch_version": str(torch.__version__), "reference_dtype": "torch.float64",
         "model_dtype": "torch.float32", "diagnostic_dtype": "torch.float64",
-        "integrators": {"PHFNO": "Gonzalez (checkpoint default)", "FNO": "Euler (checkpoint default)"},
+        # Both models use the validated checkpoint protocol, including the exact solver tolerances.
+        "integrators": {name: configs["velocity"].integration_method for name in ("PHFNO", "FNO")},
+        "solver_options": configs["velocity"].solver_options,
+        "protocol_version": configs["velocity"].protocol_version,
         "protocol": "Clean held-out t=0; autonomous recurrence with prescribed left-endpoint forcing; no resets",
         "error_normalization": "Per-trajectory initial componentwise velocity RMS",
-        "failure_policy": "Record nonfinite states or Gonzalez nonconvergence per trajectory; no restart; NaN tail",
+        "failure_policy": "Record nonfinite states or AVF/Gonzalez nonconvergence per trajectory; no restart; NaN tail",
         "aggregation": "Equal weight for trajectories and seeds; no omission of failed trajectories",
     }
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -318,7 +344,11 @@ def run_long_comparison(dataset_dir, checkpoint_dirs, output_dir, device="cuda")
                         print(f"Rolling out {representation} {name}, seed {seed}, {family}", flush=True)
                         reference = torch.load(output_dir / "references" / f"{family}.pt",
                                                map_location="cpu", weights_only=True, mmap=True)
-                        metrics = evaluate_long_model(model, reference, representation, device)
+                        # Use the validation-selected checkpoint's solver for every autonomous step.
+                        metrics = evaluate_long_model(
+                            model, reference, representation, device,
+                            method=run["integration_method"], solver_options=run["solver_options"],
+                        )
                         prediction_path = metric_path.with_name(f"{name}_{seed}_{family}_prediction.pt")
                         predictions = {key: metrics.pop(key) for key in ("prediction", "vorticity_prediction") if key in metrics}
                         metric_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict
 
 import pytest
 import torch
@@ -29,6 +30,11 @@ class ScalarModel(nn.Module):
         if self.training:
             self.training_inputs.append(field[:, 0, 0, 0, 0].detach().clone())
         return self.weight * field
+
+    def step(self, field, control, dt, method="avf", solver_options=None):
+        # Training fixtures implement the discrete-step interface used by both models.
+        assert method == "avf"
+        return field + dt.reshape(-1, 1, 1, 1, 1) * self(field, control)
 
 
 def small_config(**kwargs):
@@ -65,7 +71,10 @@ def test_predict_next_matches_native_steps_for_varying_intervals(name):
     with torch.no_grad():
         prediction = predict_next(model, transitions, torch.arange(3))
         expected = torch.cat([
-            model.step(transitions["field"][i:i + 1], transitions["control"][i:i + 1], dt)
+            model.step(
+                transitions["field"][i:i + 1], transitions["control"][i:i + 1], dt,
+                method="avf",
+            )
             for i, dt in enumerate(transitions["dt"])
         ])
     torch.testing.assert_close(prediction, expected, atol=1e-6, rtol=1e-5)
@@ -93,6 +102,47 @@ def test_overlapping_trajectory_splits_are_rejected():
         small_config(validation_indices=(1,))
     with pytest.raises(ValueError, match="disjoint"):
         small_config(test_indices=(2,))
+
+
+def test_saved_config_requires_explicit_protocol_and_solver_metadata():
+    # Old dictionaries must not acquire current integration and loss settings by default.
+    recorded = asdict(small_config())
+    assert ComparisonConfig.from_record(recorded) == small_config()
+    assert ComparisonConfig.from_record(json.loads(json.dumps(recorded))) == small_config()
+    for key in ("protocol_version", "loss_definition", "integration_method",
+                "theta_update_start", "theta_update_interval", "avf_max_iterations",
+                "avf_rtol", "avf_atol", "avf_quadrature_points"):
+        legacy = {name: value for name, value in recorded.items() if name != key}
+        with pytest.raises(ValueError, match=f"missing {key}"):
+            ComparisonConfig.from_record(legacy)
+
+
+@pytest.mark.parametrize("steps,start,interval,expected", [
+    (23, 20, 5, [*range(1, 21), 23]),
+    (14, 3, 5, [1, 2, 3, 8, 13, 14]),
+    (7, 0, 3, [3, 6, 7]),
+])
+def test_accumulation_updates_at_relative_group_ends(monkeypatch, steps, start, interval, expected):
+    # Offset starts and partial final groups previously caused early/discarded updates.
+    training = prepare_transitions({"sample": sample_data()}, [0, 1], "cpu")
+    validation = prepare_transitions({"sample": sample_data()}, [2], "cpu")
+    model = ScalarModel()
+    updates = []
+    original_step = torch.optim.Adam.step
+
+    def capture_step(optimizer, *args, **kwargs):
+        updates.append(len(model.training_inputs) - 1)  # Exclude the initialization pass.
+        return original_step(optimizer, *args, **kwargs)
+
+    monkeypatch.setattr(torch.optim.Adam, "step", capture_step)
+    config = small_config(steps=steps, theta_update_start=start,
+                          theta_update_interval=interval, eval_every=1)
+    result = train_model(model, training, validation, config, 7, 1.0, 0.0)
+    assert updates == expected
+    assert result["optimizer_updates"] == len(expected)
+    for entry in result["history"]:
+        assert entry["optimizer_updates"] == sum(step <= entry["step"] for step in expected)
+    assert result["best_optimizer_updates"] == sum(step <= result["best_step"] for step in expected)
 
 
 def test_training_uses_seeded_batches_and_restores_best_validation_weights():
@@ -204,12 +254,21 @@ def test_small_cpu_comparison_saves_selected_models_and_test_results(tmp_path):
     summary = json.loads((tmp_path / "summary.json").read_text())
     assert summary["config"]["test_indices"] == [3]
     assert summary["hardware"] == "CPU"
+    # Saved predictions must reproduce the explicitly recorded training integrator.
+    assert result["evaluation_method"] == "avf"
     for run in result["runs"]:
         checkpoint = torch.load(tmp_path / f"{run['model']}_7.pt", weights_only=True)
         assert checkpoint["best_step"] == run["best_step"]
+        assert checkpoint["best_optimizer_updates"] == run["best_optimizer_updates"]
         metrics = run["test"]["constant"]
         torch.testing.assert_close(metrics["truth"], data["clean"][[3]])
         assert torch.isfinite(metrics["nrmse_time"]).all()
+        model = build_model(run["model"], config, (8, 8, 8))
+        model.load_state_dict(checkpoint["state_dict"])
+        with torch.no_grad():
+            expected = model.rollout(data["clean"][[3], 0], data["controls"][[3]], data["times"],
+                                     method=config.integration_method, solver_options=config.solver_options)
+        torch.testing.assert_close(metrics["prediction"], expected)
         assert all(value.device.type == "cpu" for value in checkpoint["state_dict"].values())
     assert (tmp_path / "config.json").is_file()
     assert (tmp_path / "results.pt").is_file()
